@@ -1,0 +1,17 @@
+{
+  "name": "Glory Round – Rondaan Keselamatan & Utiliti Luar",
+  "short_name": "Glory Round",
+  "description": "Borang rondaan keselamatan & utiliti luar dengan gambar bukti. Data disimpan dalam Google Sheet.",
+  "lang": "ms",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f3ee",
+  "theme_color": "#0b6b5f",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
