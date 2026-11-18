@@ -30,7 +30,7 @@ const HEAD = {
     'Tindakan Diambil', 'Maklumbalas', 'PIC (Maklumbalas)', 'Gambar Selesai', 'Selesai', 'Status Isu',
     'Dicipta', 'Dikemas Kini', 'Oleh (Penemuan)', 'Oleh (Maklumbalas)', 'Dipadam', 'Pratonton Gambar', 'Pratonton Selesai']
 };
-const SEED_PIC = ['Medivest', 'UPPP', 'UKK'];
+const SEED_PIC = []; // PIC diisi sendiri oleh pengguna dalam app (atau tambah senarai pantas di tab 'Senarai PIC')
 
 // [No, Kategori EN, Kategori BM, Item EN, Item BM]
 const SEED = [
@@ -78,7 +78,7 @@ function setup() {
     items.getRange(2, 1, rows.length, 6).setValues(rows);
   }
   if (pic.getLastRow() < 2) {
-    pic.getRange(2, 1, SEED_PIC.length, 1).setValues(SEED_PIC.map(function (p) { return [p]; }));
+    if (SEED_PIC.length) pic.getRange(2, 1, SEED_PIC.length, 1).setValues(SEED_PIC.map(function (p) { return [p]; }));
   }
   getFolder_();
   Logger.log('Siap. Sheet: ' + ss.getUrl());

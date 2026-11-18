@@ -456,14 +456,14 @@ function issueHtml(i, bil) {
       <button class="icon-sm" data-act="idel" data-iid="${i.id}" aria-label="Padam isu">${ICON.trash}</button></div>
     ${fld(i, 'a', 'penemuan', 'Penemuan', '/ Findings')}
     ${fld(i, 'a', 'tindakan', 'Tindakan yang perlu diambil', '/ Action required')}
-    <label class="f"><span>PIC <em>(unit atau nama)</em></span><input type="text" data-iid="${i.id}" data-g="a" data-k="pic" list="pics" value="${esc(i.a.pic)}" autocomplete="off"></label>
+    <label class="f"><span>PIC <em>(taip unit atau nama)</em></span><input type="text" data-iid="${i.id}" data-g="a" data-k="pic" list="pics" value="${esc(i.a.pic)}" autocomplete="off"></label>
     ${picChips(i, 'a', 'pic')}
     <div class="photos">${tiles(i, 'a', 'fotos')}</div>
     <button class="after-toggle" data-act="itoggle" data-iid="${i.id}" aria-expanded="${open}"><span>Tindakan diambil & maklumbalas</span><b>${open ? '▴' : '▾'}</b></button>
     ${open ? `<div class="after">
       ${fld(i, 'b', 'diambil', 'Tindakan yang sudah diambil', '/ Action taken')}
       ${fld(i, 'b', 'maklumbalas', 'Maklumbalas', '/ Feedback')}
-      <label class="f"><span>PIC <em>(unit atau nama)</em></span><input type="text" data-iid="${i.id}" data-g="b" data-k="picM" list="pics" value="${esc(i.b.picM)}" autocomplete="off"></label>
+      <label class="f"><span>PIC <em>(taip unit atau nama)</em></span><input type="text" data-iid="${i.id}" data-g="b" data-k="picM" list="pics" value="${esc(i.b.picM)}" autocomplete="off"></label>
       ${picChips(i, 'b', 'picM')}
       <div class="photos">${tiles(i, 'b', 'fotosSelesai')}</div>
       <label class="chk"><input type="checkbox" data-iid="${i.id}" data-g="b" data-k="selesai" ${i.b.selesai ? 'checked' : ''}> Tandakan isu ini selesai</label>
@@ -528,11 +528,11 @@ function viewReport() {
     <button class="btn light" data-act="print">${ICON.print} Cetak / PDF</button>
   </header>
   <main class="wide"><div class="paper-wrap"><div class="paper" id="paper">${reportHtml(S.cur)}</div></div>
-    <p class="hint">Tekan <b>Cetak / PDF</b>, kemudian pilih <b>Simpan sebagai PDF</b> untuk kongsi laporan.</p></main>`;
+    <p class="hint">Laporan dalam format A4 landskap. Tekan <b>Cetak / PDF</b>, kemudian pilih <b>Simpan sebagai PDF</b>.</p></main>`;
 }
 function fitPaper() {
   const p = $('#paper'); if (!p) return;
-  const s = Math.min(1, (document.documentElement.clientWidth - 24) / 780);
+  const s = Math.min(1, (document.documentElement.clientWidth - 24) / 1084);
   p.style.zoom = s;
 }
 async function printReport() {

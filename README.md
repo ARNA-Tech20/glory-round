@@ -33,7 +33,7 @@ Borang Excel `GLORY ROUND` ditukar kepada app telefon (PWA). Data disimpan dalam
 3. Setiap isu: **Penemuan**, **Tindakan yang perlu diambil**, **PIC** (unit atau nama; tekan butang Medivest / UPPP / UKK atau taip sendiri) dan seberapa banyak **gambar** (kamera atau galeri).
 4. **Simpan & Hantar** menghantar gambar ke Drive dan data ke Sheet. Tanpa internet, data disimpan dalam telefon dan dihantar sendiri kemudian.
 5. **Selepas kerja siap**: sesiapa boleh buka tab **Isu terbuka** (atau buka rondaan), tekan isu, kembangkan **Tindakan diambil & maklumbalas**, isi *Tindakan yang sudah diambil*, *Maklumbalas*, PIC, gambar selesai, dan tanda **selesai**. Dua orang boleh edit rondaan yang sama; data digabung ikut isu (bahagian penemuan dan bahagian maklumbalas disimpan berasingan).
-6. Ikon dokumen (atas) membuka **Laporan Glory Round** ikut lakaran: Tarikh, Masa, Tempat, Ketua Rondaan; Jadual A (Bil., Penemuan, Tindakan perlu diambil, PIC, Gambar) dan Jadual B (Tindakan sudah diambil, Maklumbalas, PIC, Gambar). Tekan **Cetak / PDF** > Simpan sebagai PDF.
+6. Ikon dokumen (atas) membuka **Laporan Glory Round** ikut lakaran: Tarikh, Masa, Tempat, Ketua Rondaan; Jadual A (Bil., Penemuan, Tindakan perlu diambil, PIC, Gambar) dan Jadual B (Tindakan sudah diambil, Maklumbalas, PIC, Gambar), kertas A4 landskap. Tekan **Cetak / PDF** > Simpan sebagai PDF.
 
 ## Struktur Google Sheet
 
