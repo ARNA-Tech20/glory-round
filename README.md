@@ -22,6 +22,8 @@ Borang Excel `GLORY ROUND` ditukar kepada app telefon (PWA). Data disimpan dalam
 | 6 | Sambung | Buka URL PWA di telefon > Tetapan > tampal URL `/exec` > Uji sambungan > Simpan |
 | 7 | Pasang di telefon | Android Chrome: menu ⋮ > Pasang app. iPhone Safari: Kongsi > Tambah ke Skrin Utama |
 
+> Skrip mesti dibuka dari **dalam Sheet** (Extensions > Apps Script). Jika dicipta di script.google.com, ralat `getSheetByName of null` akan keluar: isi `SHEET_ID` di bahagian atas `Code.gs` (ID dalam URL Sheet antara `/d/` dan `/edit`).
+
 > Jika Code.gs diubah selepas deploy: Deploy > Manage deployments > Edit > Version: **New version** > Deploy. URL kekal sama.
 
 ## Cara guna

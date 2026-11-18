@@ -13,6 +13,7 @@
 
 const PIN = '';                        // PIN pilihan (kosong = tiada PIN). Mesti sama dengan PIN dalam tetapan app.
 const PUBLIC_PHOTOS = true;            // true = gambar boleh dipapar dalam app & sheet (sesiapa yang ada pautan)
+const SHEET_ID = '';                   // Hanya perlu jika skrip dicipta di script.google.com (bukan dari dalam Sheet): tampal ID Sheet (bahagian antara /d/ dan /edit dalam URL)
 const FOLDER_NAME = 'GLORY ROUND - Gambar';
 const LIST_LIMIT = 200;
 
@@ -53,7 +54,7 @@ const SEED = [
 /* ───────────── Pemasangan ───────────── */
 
 function setup() {
-  const ss = SpreadsheetApp.getActive();
+  const ss = ss_();
   const items = ensureSheet_(ss, SH.items, HEAD.items);
   ensureSheet_(ss, SH.rondaan, HEAD.rondaan);
   ensureSheet_(ss, SH.butiran, HEAD.butiran);
@@ -252,8 +253,14 @@ function validId_(id) {
   return s;
 }
 
+function ss_() {
+  const ss = SHEET_ID ? SpreadsheetApp.openById(SHEET_ID) : SpreadsheetApp.getActive();
+  if (!ss) throw new Error('Tiada Google Sheet terikat. Buka Sheet > Extensions > Apps Script, ATAU isi SHEET_ID di bahagian atas Code.gs.');
+  return ss;
+}
+
 function sheet_(name) {
-  const sh = SpreadsheetApp.getActive().getSheetByName(name);
+  const sh = ss_().getSheetByName(name);
   if (!sh) throw new Error('Tab "' + name + '" tiada. Jalankan setup() dahulu.');
   return sh;
 }
