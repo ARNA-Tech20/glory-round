@@ -198,7 +198,8 @@ async function syncAll(manual = false) {
   try { await pull(); } catch (e) { err ||= e.message; }
   S.syncing = false; S.progress = '';
   if (S.view === 'home') render(); else updateSyncUi();
-  if (err) toast('Ralat segerak: ' + err);
+  if (err && /PIN/.test(err) && S.view !== 'settings') { toast('PIN diperlukan. Masukkan PIN dalam Tetapan.'); nav('settings'); }
+  else if (err) toast('Ralat segerak: ' + err);
   else if (manual || sent) toast(sent ? `${sent} rondaan disimpan ke Google Sheet` : 'Sudah dikemas kini');
 }
 
