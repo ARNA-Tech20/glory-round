@@ -1,5 +1,5 @@
 // Service worker: app boleh dibuka tanpa internet (cangkerang sahaja; data ada dalam IndexedDB).
-const VERSION = 'gr-v2';
+const VERSION = 'gr-v3';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'config.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
@@ -18,7 +18,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   const url = new URL(req.url);
-  if (req.method !== 'GET' || url.origin !== location.origin) return; // API & gambar Drive terus ke rangkaian
+  if (req.method !== 'GET' || url.origin !== location.origin || url.pathname.endsWith('/api')) return; // API & gambar Drive terus ke rangkaian
 
   // Stale-while-revalidate untuk fail app
   e.respondWith(

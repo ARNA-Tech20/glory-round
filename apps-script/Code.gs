@@ -1,28 +1,36 @@
 /**
- * GLORY ROUND – Backend untuk PWA (Google Apps Script)
+ * GLORY ROUND v2 – Backend untuk PWA (Google Apps Script)
  *
- * Cara pasang: buka Google Sheet > Extensions > Apps Script > tampal fail ini
- * > jalankan setup() sekali > Deploy > New deployment > Web app
- * (Execute as: Me, Who has access: Anyone). Salin URL /exec ke tetapan PWA.
+ * Pasang: buka Google Sheet > Extensions > Apps Script > tampal fail ini > Run setup()
+ * > Deploy > New deployment > Web app (Execute as: Me, Access: Anyone) > salin URL /exec.
+ * Selepas mengemas kini kod: Deploy > Manage deployments > Edit > Version: New version.
  *
- * Tab yang dicipta:
- *   Senarai Semak : 23 item borang (boleh diedit; Aktif = N untuk sorok item)
- *   Rondaan       : 1 baris setiap rondaan (lokasi, tarikh, masa, pegawai, jumlah Y/N/NA)
- *   Butiran       : 1 baris setiap item setiap rondaan (status, penemuan, tindakan, gambar)
+ * Tab:
+ *   Senarai Semak : 23 item borang (Aktif = N untuk sorok)
+ *   Senarai PIC   : cadangan PIC (unit / nama) yang dipaparkan sebagai butang dalam app
+ *   Rondaan       : 1 baris setiap rondaan (tempat, tarikh, masa, ketua rondaan, jumlah)
+ *   Butiran       : 1 baris setiap item setiap rondaan (status Y / N / NA)
+ *   Isu           : 1 baris setiap isu (penemuan, tindakan perlu, PIC, gambar, tindakan diambil, maklumbalas)
  */
 
 const PIN = '';                        // PIN pilihan (kosong = tiada PIN). Mesti sama dengan PIN dalam tetapan app.
+const SHEET_ID = '';                   // Hanya jika skrip dicipta di script.google.com (bukan dari dalam Sheet)
 const PUBLIC_PHOTOS = true;            // true = gambar boleh dipapar dalam app & sheet (sesiapa yang ada pautan)
-const SHEET_ID = '';                   // Hanya perlu jika skrip dicipta di script.google.com (bukan dari dalam Sheet): tampal ID Sheet (bahagian antara /d/ dan /edit dalam URL)
 const FOLDER_NAME = 'GLORY ROUND - Gambar';
 const LIST_LIMIT = 200;
+const OPEN_LIMIT = 400;
 
-const SH = { items: 'Senarai Semak', rondaan: 'Rondaan', butiran: 'Butiran' };
+const SH = { items: 'Senarai Semak', pic: 'Senarai PIC', rondaan: 'Rondaan', butiran: 'Butiran', isu: 'Isu' };
 const HEAD = {
   items: ['No', 'Kategori (EN)', 'Kategori (BM)', 'Item (EN)', 'Item (BM)', 'Aktif'],
-  rondaan: ['ID', 'Lokasi', 'Tarikh', 'Masa', 'Pegawai Pemeriksa', 'Patuh (Y)', 'Tidak Patuh (N)', 'NA', 'Belum Diisi', 'Dikemas Kini'],
-  butiran: ['ID Rondaan', 'No', 'Kategori', 'Item', 'Status', 'Penemuan', 'Tindakan', 'Gambar', 'Gambar Selesai', 'Dikemas Kini', 'Pratonton Gambar', 'Pratonton Selesai']
+  pic: ['PIC (unit / nama)'],
+  rondaan: ['ID', 'Tempat', 'Tarikh', 'Masa', 'Ketua Rondaan', 'Patuh (Y)', 'Tidak Patuh (N)', 'NA', 'Belum Diisi', 'Jumlah Isu', 'Isu Belum Selesai', 'Dikemas Kini'],
+  butiran: ['ID Rondaan', 'No', 'Kategori', 'Item', 'Status', 'Bil. Isu', 'Dikemas Kini'],
+  isu: ['ID Isu', 'ID Rondaan', 'No', 'Bil.', 'Penemuan', 'Tindakan Perlu Diambil', 'PIC (Tindakan)', 'Gambar',
+    'Tindakan Diambil', 'Maklumbalas', 'PIC (Maklumbalas)', 'Gambar Selesai', 'Selesai', 'Status Isu',
+    'Dicipta', 'Dikemas Kini', 'Oleh (Penemuan)', 'Oleh (Maklumbalas)', 'Dipadam', 'Pratonton Gambar', 'Pratonton Selesai']
 };
+const SEED_PIC = ['Medivest', 'UPPP', 'UKK'];
 
 // [No, Kategori EN, Kategori BM, Item EN, Item BM]
 const SEED = [
@@ -55,13 +63,22 @@ const SEED = [
 
 function setup() {
   const ss = ss_();
+  // Struktur lama (v1) dialih nama kepada "(lama)", tidak dipadam
+  migrate_(ss, SH.rondaan, HEAD.rondaan);
+  migrate_(ss, SH.butiran, HEAD.butiran);
+  migrate_(ss, SH.isu, HEAD.isu);
   const items = ensureSheet_(ss, SH.items, HEAD.items);
+  const pic = ensureSheet_(ss, SH.pic, HEAD.pic);
   ensureSheet_(ss, SH.rondaan, HEAD.rondaan);
   ensureSheet_(ss, SH.butiran, HEAD.butiran);
+  ensureSheet_(ss, SH.isu, HEAD.isu);
   if (items.getLastRow() < 2) {
     const rows = SEED.map(function (r) { return r.concat(['Y']); });
     items.getRange(2, 2, rows.length, 4).setNumberFormat('@');
     items.getRange(2, 1, rows.length, 6).setValues(rows);
+  }
+  if (pic.getLastRow() < 2) {
+    pic.getRange(2, 1, SEED_PIC.length, 1).setValues(SEED_PIC.map(function (p) { return [p]; }));
   }
   getFolder_();
   Logger.log('Siap. Sheet: ' + ss.getUrl());
@@ -73,12 +90,12 @@ function setup() {
 function doGet(e) {
   try {
     const p = (e && e.parameter) || {};
-    if (!p.action) return out_({ ok: true, name: 'GLORY ROUND API', time: now_() });
+    if (!p.action) return out_({ ok: true, name: 'GLORY ROUND API', version: 2, time: now_() });
     auth_(p.pin);
     switch (p.action) {
-      case 'ping': return out_({ ok: true, time: now_() });
-      case 'init': return out_({ ok: true, items: getItems_(false), locations: locations_(), list: list_(), limit: LIST_LIMIT, time: now_() });
-      case 'get': return out_({ ok: true, record: get_(validId_(p.id)) });
+      case 'ping': return out_({ ok: true, version: 2, time: now_() });
+      case 'init': return out_({ ok: true, version: 2, items: getItems_(false), pics: pics_(), locations: locations_(), list: list_(), open: open_(), limit: LIST_LIMIT, time: now_() });
+      case 'get': return out_({ ok: true, record: buildRecord_(validId_(p.id)) });
       default: return out_({ ok: false, error: 'Tindakan tidak dikenali' });
     }
   } catch (err) {
@@ -101,15 +118,19 @@ function doPost(e) {
   }
 }
 
-/* ───────────── Tindakan ───────────── */
+/* ───────────── Bacaan ───────────── */
+
+const I = { id: 0, rid: 1, no: 2, bil: 3, pen: 4, tin: 5, pic: 6, fot: 7, dia: 8, mak: 9, picm: 10, sel: 11, done: 12, stat: 13, cre: 14, upd: 15, byA: 16, byB: 17, del: 18 };
+const ISU_COLS = 21;
 
 function list_() {
-  const rows = table_(sheet_(SH.rondaan), 10)
+  const rows = table_(sheet_(SH.rondaan), 12)
     .filter(function (r) { return r[0] !== ''; })
     .map(function (r) {
       return {
         id: s_(r[0]), lokasi: s_(r[1]), tarikh: s_(r[2], 'yyyy-MM-dd'), masa: s_(r[3], 'HH:mm'), pegawai: s_(r[4]),
-        y: Number(r[5]) || 0, n: Number(r[6]) || 0, na: Number(r[7]) || 0, blank: Number(r[8]) || 0, updated: s_(r[9])
+        y: Number(r[5]) || 0, n: Number(r[6]) || 0, na: Number(r[7]) || 0, blank: Number(r[8]) || 0,
+        issues: Number(r[9]) || 0, open: Number(r[10]) || 0, updated: s_(r[11])
       };
     });
   rows.sort(function (a, b) { return (b.tarikh + b.masa + b.updated).localeCompare(a.tarikh + a.masa + a.updated); });
@@ -125,65 +146,177 @@ function locations_() {
   return Object.keys(count).sort(function (a, b) { return count[b] - count[a]; }).slice(0, 50);
 }
 
-function get_(id) {
-  const head = table_(sheet_(SH.rondaan), 10).filter(function (r) { return s_(r[0]) === id; })[0];
-  if (!head) throw new Error('Rondaan tidak dijumpai');
-  const items = {};
-  table_(sheet_(SH.butiran), 10).forEach(function (r) {
-    if (s_(r[0]) !== id) return;
-    items[Number(r[1])] = { status: s_(r[4]), penemuan: s_(r[5]), tindakan: s_(r[6]), foto: s_(r[7]), selesai: s_(r[8]) };
+function pics_() {
+  return table_(sheet_(SH.pic), 1).map(function (r) { return s_(r[0]).trim(); }).filter(String);
+}
+
+function open_() {
+  const meta = {};
+  table_(sheet_(SH.rondaan), 4).forEach(function (r) { meta[s_(r[0])] = { lokasi: s_(r[1]), tarikh: s_(r[2], 'yyyy-MM-dd'), masa: s_(r[3], 'HH:mm') }; });
+  const out = [];
+  table_(sheet_(SH.isu), ISU_COLS).forEach(function (r) {
+    if (s_(r[I.del]) === 'Y' || s_(r[I.stat]) === 'Selesai') return;
+    const m = meta[s_(r[I.rid])] || {};
+    out.push({
+      id: s_(r[I.id]), rid: s_(r[I.rid]), no: Number(r[I.no]), bil: s_(r[I.bil]),
+      penemuan: s_(r[I.pen]).slice(0, 200), tindakan: s_(r[I.tin]).slice(0, 160), pic: s_(r[I.pic]),
+      status: s_(r[I.stat]), lokasi: m.lokasi || '', tarikh: m.tarikh || '', masa: m.masa || '',
+      photos: split_(r[I.fot]).length
+    });
   });
+  out.sort(function (a, b) { return (b.tarikh + b.masa).localeCompare(a.tarikh + a.masa); });
+  return out.slice(0, OPEN_LIMIT);
+}
+
+function split_(v) {
+  return String(v === null || v === undefined ? '' : v).split('\n').map(function (x) { return x.trim(); }).filter(String);
+}
+
+function issueFromRow_(r) {
+  return {
+    id: s_(r[I.id]), no: Number(r[I.no]), bil: s_(r[I.bil]),
+    a: { penemuan: s_(r[I.pen]), tindakan: s_(r[I.tin]), pic: s_(r[I.pic]), fotos: split_(r[I.fot]) },
+    b: { diambil: s_(r[I.dia]), maklumbalas: s_(r[I.mak]), picM: s_(r[I.picm]), fotosSelesai: split_(r[I.sel]), selesai: s_(r[I.done]) === 'Y' },
+    status: s_(r[I.stat]), created: s_(r[I.cre]), updated: s_(r[I.upd]),
+    by: { a: s_(r[I.byA]), b: s_(r[I.byB]) }, del: s_(r[I.del]) === 'Y'
+  };
+}
+
+function issueStatus_(x) {
+  if (x.b.selesai) return 'Selesai';
+  return (x.b.diambil || x.b.maklumbalas || x.b.fotosSelesai.length) ? 'Dalam tindakan' : 'Terbuka';
+}
+
+function buildRecord_(id) {
+  const head = table_(sheet_(SH.rondaan), 12).filter(function (r) { return s_(r[0]) === id; })[0];
+  if (!head) throw new Error('Rondaan tidak dijumpai');
+  const st = {};
+  table_(sheet_(SH.butiran), 7).forEach(function (r) { if (s_(r[0]) === id) st[Number(r[1])] = s_(r[4]); });
+  const issues = table_(sheet_(SH.isu), ISU_COLS)
+    .filter(function (r) { return s_(r[I.rid]) === id; })
+    .map(issueFromRow_)
+    .filter(function (x) { return !x.del; });
   return {
     id: id,
     meta: { lokasi: s_(head[1]), tarikh: s_(head[2], 'yyyy-MM-dd'), masa: s_(head[3], 'HH:mm'), pegawai: s_(head[4]) },
-    items: items, updated: s_(head[9])
+    st: st, issues: issues, updated: s_(head[11])
   };
+}
+
+/* ───────────── Tulisan ───────────── */
+
+function urls_(arr) {
+  return (Array.isArray(arr) ? arr : []).map(url_).filter(String).slice(0, 12);
 }
 
 function save_(b) {
   const id = validId_(b.id);
-  const meta = b.meta || {};
-  const items = b.items || {};
+  const by = txt_(b.by, 100);
   const defs = getItems_(true);
+  const defNos = {};
+  defs.forEach(function (d) { defNos[d.no] = true; });
+
   const lock = LockService.getScriptLock();
   lock.waitLock(25000);
   try {
     const now = now_();
-    let y = 0, n = 0, na = 0, blank = 0;
-    const rows = [];
-    defs.forEach(function (d) {
-      const it = items[d.no] || items[String(d.no)] || null;
-      if (!d.active && !it) return;
-      const st = status_(it && it.status);
-      if (d.active) { if (st === 'Y') y++; else if (st === 'N') n++; else if (st === 'NA') na++; else blank++; }
-      rows.push([id, d.no, d.catBM || d.catEN, d.itemBM || d.itemEN, st,
-        txt_(it && it.penemuan), txt_(it && it.tindakan), url_(it && it.foto), url_(it && it.selesai), now]);
+
+    /* 1. Isu: gabung ikut kumpulan (a = penemuan, b = maklumbalas) */
+    const isuSh = sheet_(SH.isu);
+    const list = table_(isuSh, ISU_COLS).filter(function (r) { return s_(r[I.rid]) === id; }).map(issueFromRow_);
+    const byId = {};
+    list.forEach(function (x) { byId[x.id] = x; });
+    (b.issues || []).forEach(function (p) {
+      const iid = validId_(p.id);
+      let x = byId[iid];
+      if (!x) {
+        if (p.del || !defNos[Number(p.no)]) return;
+        x = {
+          id: iid, no: Number(p.no), bil: '',
+          a: { penemuan: '', tindakan: '', pic: '', fotos: [] },
+          b: { diambil: '', maklumbalas: '', picM: '', fotosSelesai: [], selesai: false },
+          status: '', created: now, updated: now, by: { a: '', b: '' }, del: false
+        };
+        list.push(x); byId[iid] = x;
+      }
+      if (p.del) x.del = true;
+      if (p.a) {
+        x.a = { penemuan: txt_(p.a.penemuan), tindakan: txt_(p.a.tindakan), pic: txt_(p.a.pic, 300), fotos: urls_(p.a.fotos) };
+        x.by.a = by;
+      }
+      if (p.b) {
+        x.b = { diambil: txt_(p.b.diambil), maklumbalas: txt_(p.b.maklumbalas), picM: txt_(p.b.picM, 300), fotosSelesai: urls_(p.b.fotosSelesai), selesai: !!p.b.selesai };
+        x.by.b = by;
+      }
+      if (p.a || p.b || p.del) x.updated = now;
     });
 
-    // Butiran: ganti semua baris rondaan ini
-    const bs = sheet_(SH.butiran);
-    removeRows_(bs, id);
-    if (rows.length) {
-      const r0 = bs.getLastRow() + 1;
-      bs.getRange(r0, 3, rows.length, 7).setNumberFormat('@');
-      bs.getRange(r0, 1, rows.length, 10).setValues(rows);
-      const formulas = rows.map(function (r, i) {
-        const rr = r0 + i;
-        return ['=IF(H' + rr + '="","",IMAGE(H' + rr + ',4,80,107))', '=IF(I' + rr + '="","",IMAGE(I' + rr + ',4,80,107))'];
+    const live = list.filter(function (x) { return !x.del; });
+    const dead = list.filter(function (x) { return x.del; });
+    live.sort(function (p, q) { return p.no - q.no || String(p.created).localeCompare(String(q.created)); });
+    const perNo = {}, seq = {};
+    live.forEach(function (x) { perNo[x.no] = (perNo[x.no] || 0) + 1; });
+    live.forEach(function (x) {
+      seq[x.no] = (seq[x.no] || 0) + 1;
+      x.bil = perNo[x.no] > 1 ? x.no + '.' + seq[x.no] : String(x.no);
+      x.status = issueStatus_(x);
+    });
+
+    removeRows_(isuSh, id, I.rid);
+    const all = live.concat(dead);
+    if (all.length) {
+      const r0 = isuSh.getLastRow() + 1;
+      const rows = all.map(function (x) {
+        return [x.id, id, x.no, x.bil, x.a.penemuan, x.a.tindakan, x.a.pic, x.a.fotos.join('\n'),
+          x.b.diambil, x.b.maklumbalas, x.b.picM, x.b.fotosSelesai.join('\n'), x.b.selesai ? 'Y' : '',
+          x.del ? 'Dipadam' : x.status, x.created, x.updated, x.by.a, x.by.b, x.del ? 'Y' : ''];
       });
-      bs.getRange(r0, 11, rows.length, 2).setFormulas(formulas);
-      rows.forEach(function (r, i) { if (r[7] || r[8]) bs.setRowHeight(r0 + i, 84); });
+      isuSh.getRange(r0, 4, rows.length, 16).setNumberFormat('@');
+      isuSh.getRange(r0, 1, rows.length, 19).setValues(rows);
+      isuSh.getRange(r0, 20, rows.length, 2).setFormulas(all.map(function (x, i) {
+        const rr = r0 + i;
+        return ['=IF(H' + rr + '="","",IFERROR(IMAGE(INDEX(SPLIT(H' + rr + ',CHAR(10)),1,1),4,80,107),""))',
+          '=IF(L' + rr + '="","",IFERROR(IMAGE(INDEX(SPLIT(L' + rr + ',CHAR(10)),1,1),4,80,107),""))'];
+      }));
+      all.forEach(function (x, i) { if (x.a.fotos.length || x.b.fotosSelesai.length) isuSh.setRowHeight(r0 + i, 84); });
     }
 
-    // Rondaan: kemas kini atau tambah
-    const rs = sheet_(SH.rondaan);
-    const line = [id, txt_(meta.lokasi, 200), txt_(meta.tarikh, 10), txt_(meta.masa, 5), txt_(meta.pegawai, 200), y, n, na, blank, now];
-    let row = findRow_(rs, id);
-    if (!row) row = rs.getLastRow() + 1;
-    rs.getRange(row, 2, 1, 4).setNumberFormat('@');
-    rs.getRange(row, 1, 1, 10).setValues([line]);
+    /* 2. Butiran: status item (hanya yang dihantar diubah) */
+    const bs = sheet_(SH.butiran);
+    const st = {};
+    table_(bs, 7).forEach(function (r) { if (s_(r[0]) === id) st[Number(r[1])] = status_(r[4]); });
+    const sent = b.statuses || {};
+    Object.keys(sent).forEach(function (k) { if (defNos[Number(k)]) st[Number(k)] = status_(sent[k]); });
+    const issuesPerNo = {};
+    live.forEach(function (x) { issuesPerNo[x.no] = (issuesPerNo[x.no] || 0) + 1; });
+    let y = 0, n = 0, na = 0, blank = 0;
+    const brows = [];
+    defs.forEach(function (d) {
+      const s = st[d.no] || '';
+      if (!d.active && !s) return;
+      if (d.active) { if (s === 'Y') y++; else if (s === 'N') n++; else if (s === 'NA') na++; else blank++; }
+      brows.push([id, d.no, d.catBM || d.catEN, d.itemBM || d.itemEN, s, issuesPerNo[d.no] || 0, now]);
+    });
+    removeRows_(bs, id, 0);
+    if (brows.length) {
+      const r0 = bs.getLastRow() + 1;
+      bs.getRange(r0, 3, brows.length, 3).setNumberFormat('@');
+      bs.getRange(r0, 1, brows.length, 7).setValues(brows);
+    }
 
-    return { ok: true, updated: now, counts: { y: y, n: n, na: na, blank: blank } };
+    /* 3. Rondaan */
+    const rs = sheet_(SH.rondaan);
+    const row = findRow_(rs, id, 0);
+    const old = row ? rs.getRange(row, 1, 1, 12).getValues()[0] : null;
+    if (!b.meta && !old) throw new Error('Maklumat rondaan (meta) diperlukan');
+    const m = b.meta || { lokasi: old[1], tarikh: s_(old[2], 'yyyy-MM-dd'), masa: s_(old[3], 'HH:mm'), pegawai: old[4] };
+    const open = live.filter(function (x) { return x.status !== 'Selesai'; }).length;
+    const line = [id, txt_(m.lokasi, 200), txt_(m.tarikh, 10), txt_(m.masa, 5), txt_(m.pegawai, 200), y, n, na, blank, live.length, open, now];
+    const target = row || rs.getLastRow() + 1;
+    rs.getRange(target, 2, 1, 4).setNumberFormat('@');
+    rs.getRange(target, 1, 1, 12).setValues([line]);
+
+    return { ok: true, updated: now, record: buildRecord_(id) };
   } finally {
     lock.releaseLock();
   }
@@ -207,8 +340,9 @@ function delete_(b) {
   const lock = LockService.getScriptLock();
   lock.waitLock(25000);
   try {
-    removeRows_(sheet_(SH.butiran), id);
-    removeRows_(sheet_(SH.rondaan), id);
+    removeRows_(sheet_(SH.isu), id, I.rid);
+    removeRows_(sheet_(SH.butiran), id, 0);
+    removeRows_(sheet_(SH.rondaan), id, 0);
     return { ok: true };
   } finally {
     lock.releaseLock();
@@ -249,7 +383,7 @@ function url_(v) {
 
 function validId_(id) {
   const s = String(id || '');
-  if (!/^[A-Za-z0-9_-]{6,40}$/.test(s)) throw new Error('ID tidak sah');
+  if (!/^[A-Za-z0-9_-]{6,48}$/.test(s)) throw new Error('ID tidak sah');
   return s;
 }
 
@@ -274,26 +408,36 @@ function ensureSheet_(ss, name, head) {
   return sh;
 }
 
+function migrate_(ss, name, head) {
+  const sh = ss.getSheetByName(name);
+  if (!sh || sh.getLastRow() === 0) return;
+  const cur = sh.getRange(1, 1, 1, head.length).getValues()[0];
+  if (cur.join('|') === head.join('|')) return;
+  let n = name + ' (lama)', k = 2;
+  while (ss.getSheetByName(n)) n = name + ' (lama ' + (k++) + ')';
+  sh.setName(n);
+}
+
 function table_(sh, ncol) {
   const n = sh.getLastRow();
   return n < 2 ? [] : sh.getRange(2, 1, n - 1, ncol).getValues();
 }
 
-function findRow_(sh, id) {
+function findRow_(sh, id, col) {
   const n = sh.getLastRow();
   if (n < 2) return 0;
-  const col = sh.getRange(2, 1, n - 1, 1).getValues();
-  for (let i = 0; i < col.length; i++) if (String(col[i][0]) === id) return i + 2;
+  const vals = sh.getRange(2, col + 1, n - 1, 1).getValues();
+  for (let i = 0; i < vals.length; i++) if (String(vals[i][0]) === id) return i + 2;
   return 0;
 }
 
-function removeRows_(sh, id) {
+function removeRows_(sh, id, col) {
   const n = sh.getLastRow();
   if (n < 2) return;
-  const col = sh.getRange(2, 1, n - 1, 1).getValues();
+  const vals = sh.getRange(2, col + 1, n - 1, 1).getValues();
   const runs = [];
-  for (let i = 0; i < col.length; i++) {
-    if (String(col[i][0]) !== id) continue;
+  for (let i = 0; i < vals.length; i++) {
+    if (String(vals[i][0]) !== id) continue;
     const last = runs[runs.length - 1];
     if (last && last.start + last.count === i + 2) last.count++;
     else runs.push({ start: i + 2, count: 1 });

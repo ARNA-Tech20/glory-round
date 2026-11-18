@@ -28,22 +28,30 @@ Borang Excel `GLORY ROUND` ditukar kepada app telefon (PWA). Data disimpan dalam
 
 ## Cara guna
 
-1. **Rondaan Baharu** > isi Lokasi, Tarikh, Masa, Pegawai.
-2. Setiap item: tekan **Y / N / NA**. Jika **N**, ruang *Penemuan*, *Tindakan* dan *Gambar Selesai* muncul. Item Y/NA boleh ditambah catatan melalui **+ Catatan**.
-3. Tekan kotak **Gambar** untuk ambil gambar (kamera atau galeri). Gambar dimampatkan (maks 1280px) dan dicop tarikh/masa.
-4. **Simpan & Hantar** menghantar gambar ke Drive dan data ke Sheet. Tanpa internet, data disimpan dalam telefon dan dihantar sendiri apabila ada internet.
-5. Untuk kemas kini kemudian (cth. isi *Gambar Selesai* selepas kerja pembaikan): buka rondaan dari senarai > ubah > Simpan & Hantar. Sheet dikemas kini pada baris yang sama.
-6. Ikon pencetak menjana laporan A4 landskap (Cetak / Simpan PDF) seperti borang asal.
+1. **Rondaan Baharu** > isi Tempat, Tarikh, Masa, Ketua Rondaan.
+2. Setiap no. item: tekan **Y / N / NA**. Jika **N**, satu isu dibuka automatik. Tekan **+ Tambah isu / penemuan** untuk isu ke-2 hingga ke-5 (dan seterusnya) bagi no. yang sama. Isu dinomborkan 2.1, 2.2, 2.3.
+3. Setiap isu: **Penemuan**, **Tindakan yang perlu diambil**, **PIC** (unit atau nama; tekan butang Medivest / UPPP / UKK atau taip sendiri) dan seberapa banyak **gambar** (kamera atau galeri).
+4. **Simpan & Hantar** menghantar gambar ke Drive dan data ke Sheet. Tanpa internet, data disimpan dalam telefon dan dihantar sendiri kemudian.
+5. **Selepas kerja siap**: sesiapa boleh buka tab **Isu terbuka** (atau buka rondaan), tekan isu, kembangkan **Tindakan diambil & maklumbalas**, isi *Tindakan yang sudah diambil*, *Maklumbalas*, PIC, gambar selesai, dan tanda **selesai**. Dua orang boleh edit rondaan yang sama; data digabung ikut isu (bahagian penemuan dan bahagian maklumbalas disimpan berasingan).
+6. Ikon dokumen (atas) membuka **Laporan Glory Round** ikut lakaran: Tarikh, Masa, Tempat, Ketua Rondaan; Jadual A (Bil., Penemuan, Tindakan perlu diambil, PIC, Gambar) dan Jadual B (Tindakan sudah diambil, Maklumbalas, PIC, Gambar). Tekan **Cetak / PDF** > Simpan sebagai PDF.
 
 ## Struktur Google Sheet
 
 | Tab | Kandungan |
 |---|---|
-| `Senarai Semak` | No, kategori & item (EN/BM), **Aktif**. Ubah ayat atau letak `N` pada Aktif untuk sorok item. App membaca senarai ini setiap kali segerak |
-| `Rondaan` | 1 baris/rondaan: ID, lokasi, tarikh, masa, pegawai, jumlah Y / N / NA / belum diisi |
-| `Butiran` | 1 baris/item/rondaan: status, penemuan, tindakan, pautan gambar, pratonton gambar (`=IMAGE`) |
+| `Senarai Semak` | No, kategori & item (EN/BM), **Aktif**. Letak `N` pada Aktif untuk sorok item |
+| `Senarai PIC` | Senarai unit/nama untuk butang pantas PIC (ubah ikut keperluan) |
+| `Rondaan` | 1 baris/rondaan: ID, tempat, tarikh, masa, ketua, jumlah Y/N/NA, jumlah isu, isu belum selesai |
+| `Butiran` | 1 baris/item/rondaan: status Y/N/NA dan bilangan isu |
+| `Isu` | 1 baris/isu: penemuan, tindakan, PIC, gambar, tindakan diambil, maklumbalas, PIC, gambar selesai, status (Terbuka / Dalam tindakan / Selesai) |
 
-Gunakan Pivot Table atau penapis pada `Butiran` untuk laporan: contohnya tapis `Status = N` dan `Gambar Selesai` kosong untuk senarai tindakan belum selesai.
+Tapis tab `Isu` mengikut `Status Isu` atau `PIC (Tindakan)` untuk pantau kerja belum siap.
+
+## Naik taraf daripada v1
+
+1. Tampal `Code.gs` baharu (padam yang lama) > Save > jalankan **setup** (tab lama dinamakan semula "(lama)"; data lama tidak dipadam).
+2. Deploy > Manage deployments > Edit > Version: **New version** > Deploy. URL kekal sama.
+3. Buka app di telefon, tutup sepenuhnya dan buka semula untuk dapat versi baharu. Rondaan v1 dalam telefon dibuang (yang sudah dihantar kekal dalam tab "(lama)").
 
 ## Keselamatan
 
@@ -55,7 +63,7 @@ Gunakan Pivot Table atau penapis pada `Butiran` untuk laporan: contohnya tapis `
 ## Had diketahui
 
 - Menukar telefon: data yang belum dihantar kekal dalam telefon lama sahaja. Tekan **Simpan & Hantar** sebelum bertukar.
-- Dua orang edit rondaan yang sama serentak: yang terakhir menyimpan akan menang.
+- Dua orang edit **medan yang sama** pada isu yang sama serentak: yang terakhir menyimpan menang.
 - Hanya 200 rondaan terkini dipaparkan dalam senarai app (semua kekal dalam Sheet).
 
 ## Hos di GitHub Pages (ganti Netlify)
@@ -63,4 +71,4 @@ Gunakan Pivot Table atau penapis pada `Butiran` untuk laporan: contohnya tapis `
 1. Cipta repo `glory-round` di GitHub, push seluruh folder ini (`git push -u origin main`).
 2. Repo > Settings > Pages > Source: **GitHub Actions**. Workflow `.github/workflows/pages.yml` akan deploy folder `pwa/` secara automatik.
 3. URL app: `https://<username>.github.io/glory-round/`
-4. Pages percuma memerlukan repo **public**. Folder ini tidak mengandungi URL Sheet atau PIN (diisi dalam Tetapan app), jadi selamat untuk public.
+4. Pages percuma memerlukan repo **public**. Jika URL `/exec` diletakkan dalam `pwa/config.js` dan repo public, sesiapa yang jumpa URL boleh mengakses data: **tetapkan PIN** dalam `Code.gs` dan Tetapan app.
