@@ -13,17 +13,18 @@
  *   Isu           : 1 baris setiap isu (penemuan, tindakan perlu, PIC, gambar, tindakan diambil, maklumbalas)
  */
 
-const PIN = '';                        // PIN pilihan (kosong = tiada PIN). Mesti sama dengan PIN dalam tetapan app.
+const PIN = '';                        // PIN pilihan untuk mod lama sahaja (digunakan jika tab "Pengguna" kosong).
 const SHEET_ID = '';                   // Hanya jika skrip dicipta di script.google.com (bukan dari dalam Sheet)
 const PUBLIC_PHOTOS = true;            // true = gambar boleh dipapar dalam app & sheet (sesiapa yang ada pautan)
 const FOLDER_NAME = 'GLORY ROUND - Gambar';
 const LIST_LIMIT = 200;
 const OPEN_LIMIT = 400;
 
-const SH = { items: 'Senarai Semak', pic: 'Senarai PIC', rondaan: 'Rondaan', butiran: 'Butiran', isu: 'Isu' };
+const SH = { items: 'Senarai Semak', pic: 'Senarai PIC', users: 'Pengguna', rondaan: 'Rondaan', butiran: 'Butiran', isu: 'Isu' };
 const HEAD = {
   items: ['No', 'Kategori (EN)', 'Kategori (BM)', 'Item (EN)', 'Item (BM)', 'Aktif'],
   pic: ['PIC (unit / nama)'],
+  users: ['Nama', 'ID Pengguna', 'Kata Laluan', 'Peranan', 'Aktif'],
   rondaan: ['ID', 'Tempat', 'Tarikh', 'Masa', 'Ketua Rondaan', 'Patuh (Y)', 'Tidak Patuh (N)', 'NA', 'Belum Diisi', 'Jumlah Isu', 'Isu Belum Selesai', 'Dikemas Kini', 'Disemak Oleh', 'Tandatangan Semakan', 'Tarikh Semakan', 'Masa Tamat'],
   butiran: ['ID Rondaan', 'No', 'Kategori', 'Item', 'Status', 'Bil. Isu', 'Dikemas Kini'],
   isu: ['ID Isu', 'ID Rondaan', 'No', 'Bil.', 'Penemuan', 'Tindakan Perlu Diambil', 'PIC (Tindakan)', 'Gambar',
@@ -69,6 +70,9 @@ function setup() {
   migrate_(ss, SH.isu, HEAD.isu);
   const items = ensureSheet_(ss, SH.items, HEAD.items);
   const pic = ensureSheet_(ss, SH.pic, HEAD.pic);
+  const usr = ensureSheet_(ss, SH.users, HEAD.users);
+  usr.getRange(2, 1, 998, 5).setNumberFormat('@');
+  usr.getRange(1, 7).setValue('Peranan: Pemeriksa = boleh cipta & edit rondaan sepenuhnya. Penjawab = hanya boleh isi tindakan diambil, maklumbalas & gambar selesai. Aktif: Y / N. Kata laluan ditukar kepada kod hash selepas log masuk pertama.');
   ensureSheet_(ss, SH.rondaan, HEAD.rondaan);
   ensureSheet_(ss, SH.butiran, HEAD.butiran);
   ensureSheet_(ss, SH.isu, HEAD.isu);
@@ -90,33 +94,41 @@ function setup() {
 function doGet(e) {
   try {
     const p = (e && e.parameter) || {};
-    if (!p.action) return out_({ ok: true, name: 'GLORY ROUND API', version: 2, time: now_() });
-    auth_(p.pin);
-    switch (p.action) {
-      case 'ping': return out_({ ok: true, version: 2, time: now_() });
-      case 'init': return out_({ ok: true, version: 2, items: getItems_(false), pics: pics_(), locations: locations_(), list: list_(), open: open_(), limit: LIST_LIMIT, time: now_() });
-      case 'get': return out_({ ok: true, record: buildRecord_(validId_(p.id)) });
-      default: return out_({ ok: false, error: 'Tindakan tidak dikenali' });
-    }
+    if (!p.action) return out_({ ok: true, name: 'GLORY ROUND API', version: 3, time: now_() });
+    return out_(dispatch_(p));
   } catch (err) {
-    return out_({ ok: false, error: String((err && err.message) || err) });
+    return errOut_(err);
   }
 }
-
 function doPost(e) {
   try {
-    const b = JSON.parse((e && e.postData && e.postData.contents) || '{}');
-    auth_(b.pin);
-    switch (b.action) {
-      case 'save': return out_(save_(b));
-      case 'photo': return out_(photo_(b));
-      case 'delete': return out_(delete_(b));
-      default: return out_({ ok: false, error: 'Tindakan tidak dikenali' });
-    }
+    return out_(dispatch_(JSON.parse((e && e.postData && e.postData.contents) || '{}')));
   } catch (err) {
-    return out_({ ok: false, error: String((err && err.message) || err) });
+    return errOut_(err);
   }
 }
+function errOut_(err) {
+  return out_({ ok: false, error: String((err && err.message) || err), code: (err && err.code) || '' });
+}
+
+function dispatch_(b) {
+  const me = auth_(b);
+  const meOut = { nama: me.nama, peranan: me.peranan, legacy: !!me.legacy };
+  switch (b.action) {
+    case 'ping': case 'login': return { ok: true, version: 3, me: meOut, time: now_() };
+    case 'init': return { ok: true, version: 3, me: meOut, items: getItems_(false), pics: pics_(), locations: locations_(), list: list_(), open: open_(), limit: LIST_LIMIT, time: now_() };
+    case 'get': return { ok: true, record: buildRecord_(validId_(b.id)) };
+    case 'save': return save_(b, me);
+    case 'photo':
+      if (me.peranan === 'Penjawab' && b.kind !== 'selesai') deny_();
+      return photo_(b);
+    case 'delete':
+      if (me.peranan === 'Penjawab') deny_();
+      return delete_(b);
+    default: return { ok: false, error: 'Tindakan tidak dikenali' };
+  }
+}
+function deny_() { const e = new Error('Akaun anda tidak dibenarkan melakukan tindakan ini'); e.code = 'DENIED'; throw e; }
 
 /* ───────────── Bacaan ───────────── */
 
@@ -209,9 +221,11 @@ function urls_(arr) {
   return (Array.isArray(arr) ? arr : []).map(url_).filter(String).slice(0, 12);
 }
 
-function save_(b) {
+function save_(b, me) {
   const id = validId_(b.id);
-  const by = txt_(b.by, 100);
+  const limited = me.peranan === 'Penjawab';
+  const by = txt_(me.nama || b.by, 100);
+  if (limited) { b.meta = null; b.statuses = {}; }
   const defs = getItems_(true);
   const defNos = {};
   defs.forEach(function (d) { defNos[d.no] = true; });
@@ -220,6 +234,7 @@ function save_(b) {
   lock.waitLock(25000);
   try {
     const now = now_();
+    if (limited && !findRow_(sheet_(SH.rondaan), id, 0)) deny_();
 
     /* 1. Isu: gabung ikut kumpulan (a = penemuan, b = maklumbalas) */
     const isuSh = sheet_(SH.isu);
@@ -230,7 +245,7 @@ function save_(b) {
       const iid = validId_(p.id);
       let x = byId[iid];
       if (!x) {
-        if (p.del || !defNos[Number(p.no)]) return;
+        if (limited || p.del || !defNos[Number(p.no)]) return;
         x = {
           id: iid, no: Number(p.no), bil: '',
           a: { penemuan: '', tindakan: '', pic: '', fotos: [] },
@@ -239,8 +254,8 @@ function save_(b) {
         };
         list.push(x); byId[iid] = x;
       }
-      if (p.del) x.del = true;
-      if (p.a) {
+      if (p.del && !limited) x.del = true;
+      if (p.a && !limited) {
         x.a = { penemuan: txt_(p.a.penemuan), tindakan: txt_(p.a.tindakan), pic: txt_(p.a.pic, 300), fotos: urls_(p.a.fotos) };
         x.by.a = by;
       }
@@ -248,7 +263,7 @@ function save_(b) {
         x.b = { diambil: txt_(p.b.diambil), maklumbalas: txt_(p.b.maklumbalas), picM: txt_(p.b.picM, 300), fotosSelesai: urls_(p.b.fotosSelesai), selesai: !!p.b.selesai };
         x.by.b = by;
       }
-      if (p.a || p.b || p.del) x.updated = now;
+      if ((p.a && !limited) || p.b || (p.del && !limited)) x.updated = now;
     });
 
     const live = list.filter(function (x) { return !x.del; });
@@ -308,6 +323,7 @@ function save_(b) {
     const rs = sheet_(SH.rondaan);
     const row = findRow_(rs, id, 0);
     const old = row ? rs.getRange(row, 1, 1, 16).getValues()[0] : null;
+    if (limited && !old) deny_();
     if (!b.meta && !old) throw new Error('Maklumat rondaan (meta) diperlukan');
     const m = b.meta || { lokasi: old[1], tarikh: s_(old[2], 'yyyy-MM-dd'), masa: s_(old[3], 'HH:mm'), pegawai: old[4], semakNama: s_(old[12]), semakTtd: s_(old[13]), semakTarikh: s_(old[14], 'yyyy-MM-dd'), masaTamat: s_(old[15], 'HH:mm') };
     const open = live.filter(function (x) { return x.status !== 'Selesai'; }).length;
@@ -352,8 +368,47 @@ function delete_(b) {
 
 /* ───────────── Pembantu ───────────── */
 
-function auth_(pin) {
-  if (PIN && String(pin || '') !== String(PIN)) throw new Error('PIN salah');
+function hex_(bytes) { return bytes.map(function (x) { return ('0' + ((x + 256) % 256).toString(16)).slice(-2); }).join(''); }
+function hashPw_(pw, salt) { return 'sha256:' + salt + ':' + hex_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, salt + '|' + pw)); }
+function loginErr_(msg) { const e = new Error(msg); e.code = 'LOGIN'; return e; }
+
+/* Pengesahan: jika tab "Pengguna" ada pengguna aktif, log masuk diwajibkan.
+   Jika kosong, mod lama (PIN pilihan) digunakan dan semua orang bertindak sebagai Pemeriksa. */
+function auth_(c) {
+  const sh = ss_().getSheetByName(SH.users);
+  const rows = sh && sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues() : [];
+  const active = [];
+  rows.forEach(function (r, i) { if (s_(r[1]) && s_(r[4]).toUpperCase() !== 'N') active.push({ r: r, row: i + 2 }); });
+  if (!active.length) {
+    if (PIN && String(c.pin || '') !== String(PIN)) throw new Error('PIN salah');
+    return { nama: '', peranan: 'Pemeriksa', legacy: true };
+  }
+  const uid = String(c.user || '').trim().toLowerCase();
+  if (!uid || !c.pass) throw loginErr_('Sila log masuk');
+  const cache = typeof CacheService !== 'undefined' ? CacheService.getScriptCache() : null;
+  const ck = 'fail_' + uid.replace(/[^a-z0-9_.-]/g, '').slice(0, 40);
+  if (cache && Number(cache.get(ck) || 0) >= 8) throw loginErr_('Terlalu banyak percubaan salah. Cuba lagi dalam 10 minit.');
+  let hit = null;
+  active.forEach(function (x) { if (s_(x.r[1]).trim().toLowerCase() === uid) hit = x; });
+  let ok = false;
+  if (hit) {
+    const stored = s_(hit.r[2]), pw = String(c.pass);
+    if (stored.indexOf('sha256:') === 0) {
+      const parts = stored.split(':');
+      ok = hashPw_(pw, parts[1]) === stored;
+    } else if (stored && stored === pw) {
+      ok = true;
+      const salt = Utilities.getUuid().replace(/-/g, '').slice(0, 12);
+      ss_().getSheetByName(SH.users).getRange(hit.row, 3).setValue(hashPw_(pw, salt));
+    }
+  }
+  if (!ok) {
+    if (cache) cache.put(ck, String(Number(cache.get(ck) || 0) + 1), 600);
+    throw loginErr_('ID pengguna atau kata laluan salah');
+  }
+  if (cache) cache.remove(ck);
+  const role = /jawab/i.test(s_(hit.r[3])) ? 'Penjawab' : 'Pemeriksa';
+  return { nama: s_(hit.r[0]) || s_(hit.r[1]), peranan: role, legacy: false };
 }
 
 function out_(obj) {

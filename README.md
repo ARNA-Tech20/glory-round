@@ -53,6 +53,25 @@ Tapis tab `Isu` mengikut `Status Isu` atau `PIC (Tindakan)` untuk pantau kerja b
 2. Deploy > Manage deployments > Edit > Version: **New version** > Deploy. URL kekal sama.
 3. Buka app di telefon, tutup sepenuhnya dan buka semula untuk dapat versi baharu. Rondaan v1 dalam telefon dibuang (yang sudah dihantar kekal dalam tab "(lama)").
 
+## Log masuk & peranan
+
+Tab **`Pengguna`** dalam Sheet (dicipta oleh `setup`) menentukan siapa boleh masuk:
+
+| Lajur | Isi |
+|---|---|
+| Nama | Nama paparan, cth. `Unit UKK`. Direkod pada setiap maklumbalas |
+| ID Pengguna | Untuk log masuk, cth. `ukk` |
+| Kata Laluan | Taip biasa; ditukar automatik kepada kod hash selepas log masuk pertama |
+| Peranan | `Pemeriksa` atau `Penjawab` |
+| Aktif | `Y` / `N` (letak `N` untuk sekat akaun) |
+
+| Peranan | Boleh | Tidak boleh |
+|---|---|---|
+| **Pemeriksa** | Cipta & edit rondaan, penemuan, tindakan, PIC, gambar, tandatangan; isi maklumbalas; padam | n/a |
+| **Penjawab** | Lihat rondaan & isu; isi *tindakan diambil*, *maklumbalas*, PIC, gambar selesai, tanda selesai; jana laporan | Cipta/edit rondaan, ubah penemuan/tindakan perlu/status item, tambah atau padam isu, padam rondaan |
+
+Sekatan dikuatkuasakan di pelayan (Apps Script), bukan hanya dalam app. Jika tab `Pengguna` **kosong**, app berfungsi seperti sebelum ini (tanpa log masuk, PIN pilihan). Selepas ada pengguna aktif, log masuk diwajibkan untuk semua orang termasuk pemeriksa, jadi tambah akaun anda sendiri dahulu. Lapan percubaan salah menyekat ID itu 10 minit.
+
 ## Keselamatan
 
 - **PIN**: tukar `const PIN = ''` dalam `Code.gs` (cth. `'4821'`), deploy versi baharu, kemudian isi PIN yang sama dalam Tetapan app. Ini halangan asas sahaja, bukan pengesahan penuh.

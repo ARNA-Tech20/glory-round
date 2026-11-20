@@ -37,8 +37,10 @@ const DEF = Object.assign({ url: '', pin: '', officer: '' }, window.GLORY_CONFIG
 const cfg = (() => {
   let st = {};
   try { st = JSON.parse(localStorage.getItem('gr.cfg') || '{}'); } catch { /* abaikan */ }
-  return { url: st.url || DEF.url || '', pin: st.pin || DEF.pin || '', officer: st.officer || DEF.officer || '', stamp: st.stamp === undefined ? true : !!st.stamp };
+  return { url: st.url || DEF.url || '', pin: st.pin || DEF.pin || '', officer: st.officer || DEF.officer || '', stamp: st.stamp === undefined ? true : !!st.stamp,
+    user: st.user || '', pass: st.pass || '', role: st.role || '', nama: st.nama || '' };
 })();
+const RO = () => cfg.role === 'Penjawab';
 const saveCfg = () => { try { localStorage.setItem('gr.cfg', JSON.stringify(cfg)); } catch { /* abaikan */ } };
 
 /* ───────── IndexedDB ───────── */
@@ -80,26 +82,19 @@ async function http(url, opts, ms = 40000) {
     const txt = await r.text();
     let j;
     try { j = JSON.parse(txt); } catch { throw new Error('Respons tidak sah. Semak URL & akses Web App (mesti "Anyone").'); }
-    if (!j.ok) throw new Error(j.error || 'Ralat pelayan');
+    if (!j.ok) { const er = new Error(j.error || 'Ralat pelayan'); er.code = j.code || ''; throw er; }
     return j;
   } catch (e) {
     if (e.name === 'AbortError') throw new Error('Tamat masa sambungan');
     throw e;
   } finally { clearTimeout(t); }
 }
-function apiGet(action, params = {}) {
-  if (!cfg.url) throw new Error('URL Apps Script belum ditetapkan');
-  const u = new URL(cfg.url);
-  u.searchParams.set('action', action);
-  u.searchParams.set('pin', cfg.pin || '');
-  Object.entries(params).forEach(([k, v]) => u.searchParams.set(k, v));
-  return http(u.toString(), {});
-}
+const apiGet = (action, params = {}, ms) => apiPost(action, params, ms);
 function apiPost(action, body, ms) {
   if (!cfg.url) throw new Error('URL Apps Script belum ditetapkan');
   return http(cfg.url, {
     method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action, pin: cfg.pin || '', by: cfg.officer || '', ...body })
+    body: JSON.stringify({ action, pin: cfg.pin || '', user: cfg.user || '', pass: cfg.pass || '', by: cfg.nama || cfg.officer || '', ...body })
   }, ms);
 }
 
@@ -218,6 +213,7 @@ async function syncRecord(r) {
 
 async function pull() {
   const j = await apiGet('init');
+  if (j.me) { cfg.role = j.me.peranan || ''; cfg.nama = j.me.legacy ? '' : (j.me.nama || ''); saveCfg(); }
   S.items = j.items; S.locations = j.locations || []; S.pics = j.pics || []; S.openIssues = j.open || [];
   await DB.kvSet('items', S.items).catch(() => {}); await DB.kvSet('locs', S.locations).catch(() => {});
   await DB.kvSet('pics', S.pics).catch(() => {}); await DB.kvSet('open', S.openIssues).catch(() => {});
@@ -244,14 +240,15 @@ async function syncAll(manual = false) {
   if (!cfg.url) { if (manual) toast('Tetapkan URL Apps Script dahulu'); return; }
   if (!navigator.onLine) { if (manual) toast('Luar talian – akan dihantar apabila ada internet'); return; }
   S.syncing = true; S.progress = 'Menyegerak…'; updateSyncUi();
-  let sent = 0, err = '';
+  let sent = 0, err = '', code = '';
   for (const r of [...S.records.values()].filter(isDirty)) {
-    try { await syncRecord(r); sent++; } catch (e) { err = e.message; }
+    try { await syncRecord(r); sent++; } catch (e) { err = e.message; code ||= e.code; if (e.code === 'LOGIN') break; }
   }
-  try { await pull(); } catch (e) { err ||= e.message; }
+  try { await pull(); } catch (e) { err ||= e.message; code ||= e.code; }
   S.syncing = false; S.progress = '';
   if (S.view === 'home') render(); else updateSyncUi();
-  if (err && /PIN/.test(err) && S.view !== 'settings') { toast('PIN diperlukan. Masukkan PIN dalam Tetapan.'); nav('settings'); }
+  if (code === 'LOGIN') { cfg.role = cfg.user ? cfg.role : ''; if (S.view !== 'login') { toast(err); nav('login'); } }
+  else if (err && /PIN/.test(err) && S.view !== 'settings') { toast('PIN diperlukan. Masukkan PIN dalam Tetapan.'); nav('settings'); }
   else if (err) toast('Ralat segerak: ' + err);
   else if (manual || sent) toast(sent ? `${sent} rondaan disimpan ke Google Sheet` : 'Sudah dikemas kini');
 }
@@ -294,6 +291,7 @@ async function openRecord(id, focus = '') {
 }
 
 function startNew() {
+  if (RO()) { toast('Akaun anda hanya boleh mengisi maklumbalas'); return; }
   if (!S.items.length) { toast(cfg.url ? 'Senarai semak belum dimuat. Sambung internet sekali.' : 'Tetapkan URL Apps Script dahulu'); if (!cfg.url) nav('settings'); return; }
   const r = newRecord(); S.records.set(r.id, r); S.cur = r; S.filter = 'all'; S.expand = {}; nav('editor');
 }
@@ -302,7 +300,7 @@ function startNew() {
 function render() {
   const app = $('#app');
   const v = S.view;
-  app.innerHTML = v === 'editor' && S.cur ? viewEditor() : v === 'report' && S.cur ? viewReport() : v === 'settings' ? viewSettings() : viewHome();
+  app.innerHTML = v === 'editor' && S.cur ? viewEditor() : v === 'report' && S.cur ? viewReport() : v === 'settings' ? viewSettings() : v === 'login' ? viewLogin() : viewHome();
   if (v === 'editor') { $$('textarea', app).forEach(grow); updateStats(); }
   if (v === 'report') fitPaper();
 }
@@ -356,7 +354,8 @@ function viewHome() {
   </header>
   <main>
     ${banner}
-    <button class="btn cta" data-act="new">${ICON.plus} Rondaan Baharu</button>
+    ${cfg.user ? `<div class="who">Log masuk: <b>${esc(cfg.nama || cfg.user)}</b> · ${esc(cfg.role === 'Penjawab' ? 'Penjawab maklumbalas' : 'Pemeriksa')}</div>` : ''}
+    ${RO() ? '' : `<button class="btn cta" data-act="new">${ICON.plus} Rondaan Baharu</button>`}
     <div class="tabs" role="tablist">
       <button role="tab" data-act="tab" data-t="rondaan" aria-selected="${S.tab === 'rondaan'}">Rondaan <i>${recs.length}</i></button>
       <button role="tab" data-act="tab" data-t="isu" aria-selected="${S.tab === 'isu'}">Isu terbuka <i class="${open.length ? 'hot' : ''}">${open.length}</i></button>
@@ -390,23 +389,23 @@ function viewEditor() {
     <div class="ttl"><b>Rondaan</b><small id="progTxt"></small></div>
     <span class="chip-s" id="syncChip">${esc(syncLabel())}</span>
     <button class="icon" data-act="report" aria-label="Laporan">${ICON.doc}</button>
-    <button class="icon" data-act="delete" aria-label="Padam rondaan">${ICON.trash}</button>
+    ${RO() ? '' : `<button class="icon" data-act="delete" aria-label="Padam rondaan">${ICON.trash}</button>`}
   </header>
   <div class="progress"><i id="progBar"></i></div>
   <main>
     <section class="card meta">
       <label class="f"><span>Tempat <em>/ Location</em></span>
-        <input type="text" data-meta="lokasi" list="locs" value="${esc(m.lokasi)}" placeholder="cth: Blok A – Kawasan luar" autocomplete="off"></label>
+        <input type="text" ${RO() ? 'disabled' : ''} data-meta="lokasi" list="locs" value="${esc(m.lokasi)}" placeholder="cth: Blok A – Kawasan luar" autocomplete="off"></label>
       <div class="grid2">
-        <label class="f"><span>Tarikh</span><input type="date" data-meta="tarikh" value="${esc(m.tarikh)}"></label>
-        <label class="f"><span>Masa mula</span><input type="time" data-meta="masa" value="${esc(m.masa)}"></label>
+        <label class="f"><span>Tarikh</span><input type="date" ${RO() ? 'disabled' : ''} data-meta="tarikh" value="${esc(m.tarikh)}"></label>
+        <label class="f"><span>Masa mula</span><input type="time" ${RO() ? 'disabled' : ''} data-meta="masa" value="${esc(m.masa)}"></label>
       </div>
       <div class="grid2">
-        <label class="f"><span>Masa tamat</span><input type="time" data-meta="masaTamat" value="${esc(m.masaTamat || '')}"></label>
+        <label class="f"><span>Masa tamat</span><input type="time" ${RO() ? 'disabled' : ''} data-meta="masaTamat" value="${esc(m.masaTamat || '')}"></label>
         <div class="f"><span>Tempoh</span><div class="dur" id="durTxt">${esc(duration(m.masa, m.masaTamat) || '—')}</div></div>
       </div>
       <label class="f" style="margin:0"><span>Ketua Rondaan</span>
-        <input type="text" data-meta="pegawai" value="${esc(m.pegawai)}" autocomplete="name"></label>
+        <input type="text" ${RO() ? 'disabled' : ''} data-meta="pegawai" value="${esc(m.pegawai)}" autocomplete="name"></label>
     </section>
     <datalist id="locs">${S.locations.map(l => `<option value="${esc(l)}">`).join('')}</datalist>
     <datalist id="pics">${S.pics.map(l => `<option value="${esc(l)}">`).join('')}</datalist>
@@ -422,6 +421,7 @@ function viewEditor() {
 
 const sigSrc = r => r.sigBlob ? blobUrl(r.sigBlob) : (r.meta.semakTtd || '');
 function semakHtml() {
+  if (RO()) return '';
   const r = S.cur, m = r.meta, src = sigSrc(r);
   return `<h2 class="sec">Penyedia laporan</h2><section class="card">
     <label class="f"><span>Disediakan oleh <em>(nama penyedia)</em></span><input type="text" data-meta="semakNama" value="${esc(m.semakNama || '')}" autocomplete="name"></label>
@@ -454,13 +454,13 @@ function listHtml() {
 
 function itemHtml(d) {
   const r = S.cur, st = r.st[d.no] || '', iss = issuesOf(r, d.no);
-  const btn = (s, big, sm) => `<button data-act="status" data-no="${d.no}" data-s="${s}" aria-pressed="${st === s}">${big}<small>${sm}</small></button>`;
+  const btn = (s, big, sm) => `<button data-act="status" data-no="${d.no}" data-s="${s}" aria-pressed="${st === s}" ${RO() ? 'disabled' : ''}>${big}<small>${sm}</small></button>`;
   return `<article class="item" id="it${d.no}" data-no="${d.no}" data-s="${st}">
     <div class="row"><span class="no">${d.no}</span><div>
       <p class="bm">${esc(d.itemBM || d.itemEN)}</p>${d.itemBM && d.itemEN ? `<p class="en">${esc(d.itemEN)}</p>` : ''}</div></div>
     <div class="seg" role="group" aria-label="Status item ${d.no}">${btn('Y', 'Y', 'Patuh')}${btn('N', 'N', 'Tidak patuh')}${btn('NA', 'NA', 'Tak berkaitan')}</div>
     ${iss.map(i => issueHtml(i, bilOf(r, i))).join('')}
-    <button class="add-issue ${st === 'N' && !iss.length ? 'strong' : ''}" data-act="iadd" data-no="${d.no}">${ICON.plus} Tambah isu / penemuan</button>
+    ${RO() ? '' : `<button class="add-issue ${st === 'N' && !iss.length ? 'strong' : ''}" data-act="iadd" data-no="${d.no}">${ICON.plus} Tambah isu / penemuan</button>`}
   </article>`;
 }
 
@@ -470,13 +470,14 @@ function tiles(i, g, k) {
     const src = p.blob ? blobUrl(p.blob) : p.url;
     return `<button class="ph has" data-act="pview" data-iid="${i.id}" data-g="${g}" data-n="${n}" aria-label="Lihat gambar ${n + 1}">
       <img src="${esc(src)}" alt="Gambar ${n + 1}" loading="lazy">${p.blob && !p.url ? '<i class="up" title="Belum dihantar"></i>' : ''}</button>`;
-  }).join('') + `<button class="ph" data-act="padd" data-m="cam" data-iid="${i.id}" data-g="${g}" aria-label="Ambil gambar dengan kamera">${ICON.cam}<span>Kamera</span></button><button class="ph gal" data-act="padd" data-m="gal" data-iid="${i.id}" data-g="${g}" aria-label="Pilih gambar dari galeri">${ICON.img}<span>Galeri</span></button>`;
+  }).join('') + (RO() && g === 'a' ? '' : `<button class="ph" data-act="padd" data-m="cam" data-iid="${i.id}" data-g="${g}" aria-label="Ambil gambar dengan kamera">${ICON.cam}<span>Kamera</span></button><button class="ph gal" data-act="padd" data-m="gal" data-iid="${i.id}" data-g="${g}" aria-label="Pilih gambar dari galeri">${ICON.img}<span>Galeri</span></button>`);
 }
 function picChips(i, g, k) {
+  if (RO() && g === 'a') return '';
   const cur = String(i[g][k] || '').split(',').map(x => x.trim().toLowerCase());
   return S.pics.length ? `<div class="pchips">${S.pics.map(p => `<button type="button" class="pchip" data-act="pic" data-iid="${i.id}" data-g="${g}" data-k="${k}" data-v="${esc(p)}" aria-pressed="${cur.includes(p.toLowerCase())}">${esc(p)}</button>`).join('')}</div>` : '';
 }
-const fld = (i, g, k, label, en) => `<label class="f"><span>${label} <em>${en}</em></span><textarea data-iid="${i.id}" data-g="${g}" data-k="${k}" rows="2">${esc(i[g][k])}</textarea></label>`;
+const fld = (i, g, k, label, en) => `<label class="f"><span>${label} <em>${en}</em></span><textarea ${RO() && g === 'a' ? 'disabled' : ''} data-iid="${i.id}" data-g="${g}" data-k="${k}" rows="2">${esc(i[g][k])}</textarea></label>`;
 
 function issueHtml(i, bil) {
   const stt = issueStatus(i);
@@ -484,10 +485,10 @@ function issueHtml(i, bil) {
   const open = S.expand[i.id] ?? !!hasB;
   return `<section class="issue" id="is-${i.id}" data-iid="${i.id}">
     <div class="ihead"><b>Isu ${esc(bil)}</b><span class="tag st-${stt === 'Terbuka' ? 'open' : stt === 'Selesai' ? 'done' : 'prog'}" data-badge>${stt}</span>
-      <button class="icon-sm" data-act="idel" data-iid="${i.id}" aria-label="Padam isu">${ICON.trash}</button></div>
+      ${RO() ? '' : `<button class="icon-sm" data-act="idel" data-iid="${i.id}" aria-label="Padam isu">${ICON.trash}</button>`}</div>
     ${fld(i, 'a', 'penemuan', 'Penemuan', '/ Findings')}
     ${fld(i, 'a', 'tindakan', 'Tindakan yang perlu diambil', '/ Action required')}
-    <label class="f"><span>PIC <em>(taip unit atau nama)</em></span><input type="text" data-iid="${i.id}" data-g="a" data-k="pic" list="pics" value="${esc(i.a.pic)}" autocomplete="off"></label>
+    <label class="f"><span>PIC <em>(taip unit atau nama)</em></span><input type="text" data-iid="${i.id}" data-g="a" data-k="pic" list="pics" ${RO() ? 'disabled' : ''} value="${esc(i.a.pic)}" autocomplete="off"></label>
     ${picChips(i, 'a', 'pic')}
     <div class="photos">${tiles(i, 'a', 'fotos')}</div>
     <button class="after-toggle" data-act="itoggle" data-iid="${i.id}" aria-expanded="${open}"><span>Tindakan diambil & maklumbalas</span><b>${open ? '▴' : '▾'}</b></button>
@@ -590,7 +591,7 @@ function viewSettings() {
     <section class="card">
       <label class="f"><span>URL Web App (Apps Script)</span>
         <input type="url" id="cfgUrl" value="${esc(cfg.url)}" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
-      <label class="f"><span>PIN <em>(jika ditetapkan dalam Code.gs)</em></span>
+      <label class="f"><span>PIN <em>(mod lama sahaja, jika tiada pengguna dalam Sheet)</em></span>
         <input type="password" id="cfgPin" value="${esc(cfg.pin)}" autocomplete="off"></label>
       <label class="f"><span>Nama anda <em>(Ketua Rondaan lalai & direkod pada setiap kemas kini)</em></span>
         <input type="text" id="cfgOfficer" value="${esc(cfg.officer)}" autocomplete="name"></label>
@@ -601,6 +602,7 @@ function viewSettings() {
       </div>
       <p class="hint" id="cfgMsg" style="margin:12px 0 0"></p>
     </section>
+    ${cfg.user ? `<h2 class="sec">Akaun</h2><section class="card"><p style="margin:0 0 10px">Log masuk sebagai <b>${esc(cfg.nama || cfg.user)}</b> (${esc(cfg.role === 'Penjawab' ? 'Penjawab maklumbalas' : 'Pemeriksa')})</p><button class="btn ghost" data-act="logout">Log keluar</button></section>` : ''}
     <h2 class="sec">Pasang di telefon</h2>
     <section class="card">
       ${standalone ? '<p style="margin:0">App sudah dipasang di skrin utama.</p>'
@@ -610,6 +612,39 @@ function viewSettings() {
     </section>
     <p class="hint" style="margin-top:18px">Glory Round v2 · ${S.records.size} rondaan dalam telefon</p>
   </main>`;
+}
+function viewLogin() {
+  return `
+  <header class="top"><div class="brand"><span class="logo">${ICON.loop}</span><div><b>GLORY ROUND</b><small>Log masuk</small></div></div>
+    <div class="acts"><button class="icon" data-act="settings" aria-label="Tetapan">${ICON.gear}</button></div></header>
+  <main>
+    <section class="card">
+      <label class="f"><span>ID pengguna</span><input type="text" id="lgUser" value="${esc(cfg.user)}" autocomplete="username" autocapitalize="off" spellcheck="false"></label>
+      <label class="f"><span>Kata laluan</span><input type="password" id="lgPass" autocomplete="current-password"></label>
+      <button class="btn cta" data-act="login">Log masuk</button>
+      <p class="hint" id="lgMsg" style="margin:12px 0 0">Minta ID dan kata laluan daripada pentadbir.</p>
+    </section>
+  </main>`;
+}
+async function doLogin() {
+  const u = $('#lgUser').value.trim(), p = $('#lgPass').value, msg = $('#lgMsg');
+  if (!u || !p) { msg.textContent = 'Isi ID pengguna dan kata laluan.'; return; }
+  msg.textContent = 'Menyemak…';
+  const keep = { user: cfg.user, pass: cfg.pass, role: cfg.role, nama: cfg.nama };
+  cfg.user = u; cfg.pass = p;
+  try {
+    const j = await apiPost('login', {});
+    cfg.role = j.me.peranan; cfg.nama = j.me.legacy ? '' : j.me.nama; saveCfg();
+    S.tab = cfg.role === 'Penjawab' ? 'isu' : 'rondaan';
+    setView('home'); syncAll(true);
+  } catch (e) { Object.assign(cfg, keep); msg.textContent = e.message; }
+}
+function logout() {
+  if ([...S.records.values()].some(isDirty)) { toast('Hantar data yang belum disimpan dahulu (butang segerak)'); return; }
+  cfg.user = ''; cfg.pass = ''; cfg.role = ''; cfg.nama = ''; saveCfg();
+  S.records.clear(); S.openIssues = []; S.cur = null;
+  DB.all().then(l => l.forEach(r => DB.del(r.id))).catch(() => {});
+  setView('login');
 }
 function saveSettings() {
   cfg.url = $('#cfgUrl').value.trim(); cfg.pin = $('#cfgPin').value.trim();
@@ -621,10 +656,11 @@ async function testSettings() {
   try {
     if (!/^https:\/\/script\.google\.com\//.test(cfg.url) && !/^https?:\/\/localhost/.test(cfg.url)) throw new Error('URL mesti bermula dengan https://script.google.com/');
     const j = await apiGet('init');
-    if (j.version !== 2) throw new Error('Backend masih versi lama. Tampal Code.gs terkini, jalankan setup, kemudian Deploy versi baharu.');
+    if (j.version < 3) throw new Error('Backend masih versi lama. Tampal Code.gs terkini, jalankan setup, kemudian Deploy versi baharu.');
+    if (j.me) { cfg.role = j.me.peranan; cfg.nama = j.me.legacy ? '' : j.me.nama; saveCfg(); }
     S.items = j.items; S.pics = j.pics || []; S.locations = j.locations || [];
     msg.textContent = `Berjaya: ${j.items.length} item semakan, ${j.list.length} rondaan, ${j.open.length} isu terbuka.`;
-  } catch (e) { msg.textContent = 'Gagal: ' + e.message; }
+  } catch (e) { msg.textContent = 'Gagal: ' + e.message; if (e.code === 'LOGIN') { toast('Log masuk diperlukan'); nav('login'); } }
 }
 
 /* ───────── gambar ───────── */
@@ -711,6 +747,7 @@ function toast(msg, ms = 2600) {
 document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act]'); if (!el) return;
   const act = el.dataset.act, no = el.dataset.no, iid = el.dataset.iid, r = S.cur;
+  if (RO() && (['new', 'status', 'iadd', 'idel', 'sig-open', 'sig-clear', 'delete'].includes(act) || (['padd', 'pic'].includes(act) && el.dataset.g === 'a'))) { toast('Akaun anda hanya boleh mengisi maklumbalas'); return; }
   switch (act) {
     case 'new': startNew(); break;
     case 'open': openRecord(el.dataset.id); break;
@@ -772,6 +809,8 @@ document.addEventListener('click', async e => {
       } catch (err) { toast('Gagal memadam: ' + err.message); }
       break;
     }
+    case 'login': doLogin(); break;
+    case 'logout': logout(); break;
     case 'cfg-save': saveSettings(); toast('Tetapan disimpan'); if (cfg.url) { back(); setTimeout(() => syncAll(true), 400); } break;
     case 'cfg-test': await testSettings(); break;
     case 'install': S.installEvt?.prompt(); S.installEvt = null; break;
@@ -819,6 +858,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
   } catch { /* IndexedDB tidak tersedia */ }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   if (!cfg.url) S.view = 'settings';
+  if (RO()) S.tab = 'isu';
   render();
   if (cfg.url) syncAll();
 })();
