@@ -411,8 +411,8 @@ function viewEditor() {
 const sigSrc = r => r.sigBlob ? blobUrl(r.sigBlob) : (r.meta.semakTtd || '');
 function semakHtml() {
   const r = S.cur, m = r.meta, src = sigSrc(r);
-  return `<h2 class="sec">Semakan & pengesahan</h2><section class="card">
-    <label class="f"><span>Disemak oleh <em>(nama penyemak)</em></span><input type="text" data-meta="semakNama" value="${esc(m.semakNama || '')}" autocomplete="name"></label>
+  return `<h2 class="sec">Penyedia laporan</h2><section class="card">
+    <label class="f"><span>Disediakan oleh <em>(nama penyedia)</em></span><input type="text" data-meta="semakNama" value="${esc(m.semakNama || '')}" autocomplete="name"></label>
     <div class="sig-box">${src ? `<img src="${esc(src)}" alt="Tandatangan">` : '<span>Belum ditandatangani</span>'}</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
       <button class="btn" data-act="sig-open">${src ? 'Tandatangan semula' : 'Tandatangan digital'}</button>
@@ -538,7 +538,7 @@ function reportHtml(r) {
     <table><thead><tr><th class="w1">Bil.</th><th class="w2">Tindakan yang sudah diambil</th><th class="w3">Maklumbalas</th><th class="w4">PIC</th><th class="w5">Gambar</th></tr></thead><tbody>${rows2.join('') || none}</tbody></table>
     <div class="sum">Item diperiksa: ${S.items.length} · Patuh (Y): ${c.y} · Tidak patuh (N): ${c.n} · Tidak berkaitan (NA): ${c.na} · Belum diisi: ${c.blank} · Isu: ${c.iss} (belum selesai: ${c.open})</div>
     <div class="signs">
-      <div class="sg"><b>Disemak oleh:</b><div class="sbox">${sigSrc(r) ? `<img src="${esc(sigSrc(r))}" alt="">` : ''}</div><div>Nama : ${esc(m.semakNama || '')}</div><div>Tarikh : ${fmtDate(m.semakTarikh)}</div></div>
+      <div class="sg"><b>Disediakan oleh:</b><div class="sbox">${sigSrc(r) ? `<img src="${esc(sigSrc(r))}" alt="">` : ''}</div><div>Nama : ${esc(m.semakNama || '')}</div><div>Tarikh : ${fmtDate(m.semakTarikh)}</div></div>
       <div class="sg"><b>Disahkan oleh:</b><div class="sbox"></div><div>Nama : ........................................</div><div>Jawatan : .....................................</div><div>Tarikh : ......................................</div></div>
     </div>
   </div>`;
