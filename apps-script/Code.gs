@@ -259,11 +259,13 @@ function save_(b, me) {
         x.a = { penemuan: txt_(p.a.penemuan), tindakan: txt_(p.a.tindakan), pic: txt_(p.a.pic, 300), fotos: urls_(p.a.fotos) };
         x.by.a = by;
       }
-      if (p.b) {
+      const lockedB = limited && x.b && x.b.selesai; // penjawab tidak boleh ubah isu yang sudah selesai
+      const applyB = p.b && !lockedB;
+      if (applyB) {
         x.b = { diambil: txt_(p.b.diambil), maklumbalas: txt_(p.b.maklumbalas), picM: txt_(p.b.picM, 300), fotosSelesai: urls_(p.b.fotosSelesai), selesai: !!p.b.selesai };
         x.by.b = by;
       }
-      if ((p.a && !limited) || p.b || (p.del && !limited)) x.updated = now;
+      if ((p.a && !limited) || applyB || (p.del && !limited)) x.updated = now;
     });
 
     const live = list.filter(function (x) { return !x.del; });

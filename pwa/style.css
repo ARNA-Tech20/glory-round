@@ -246,3 +246,4 @@ dialog#sigDlg::backdrop { background: #000a; }
 .who b { color: var(--ink); }
 .seg button:disabled { opacity: .55; }
 input:disabled, textarea:disabled { opacity: .75; background: var(--bg); }
+[hidden] { display: none !important; }

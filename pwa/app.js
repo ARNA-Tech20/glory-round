@@ -41,6 +41,8 @@ const cfg = (() => {
     user: st.user || '', pass: st.pass || '', role: st.role || '', nama: st.nama || '' };
 })();
 const RO = () => cfg.role === 'Penjawab';
+const lockB = i => RO() && i.b.selesai && !i.db;   // penjawab: isu selesai tidak boleh diubah
+const lockedField = (i, g) => RO() && (g === 'a' || lockB(i));
 const CAN_DEL = () => cfg.role !== 'Penjawab' && cfg.role !== 'Pemeriksa';
 const roleLabel = r => r === 'Penjawab' ? 'Penjawab maklumbalas' : r === 'Pemeriksa' ? 'Pemeriksa' : 'Penyelia';
 const saveCfg = () => { try { localStorage.setItem('gr.cfg', JSON.stringify(cfg)); } catch { /* abaikan */ } };
@@ -287,7 +289,7 @@ async function openRecord(id, focus = '') {
       mergeServer(r, j.record); await persist(r);
     } catch (e) { if (!r.loaded) { toast('Gagal memuat: ' + e.message); return; } }
   } else if (!r.loaded) { toast('Perlu internet untuk memuat rondaan ini'); return; }
-  S.cur = r; S.filter = 'all'; S.expand = {}; S.focus = focus;
+  S.cur = r; S.filter = RO() ? 'open' : 'all'; S.expand = {}; S.focus = focus;
   if (focus) S.expand[focus] = true;
   nav('editor');
 }
@@ -472,14 +474,14 @@ function tiles(i, g, k) {
     const src = p.blob ? blobUrl(p.blob) : p.url;
     return `<button class="ph has" data-act="pview" data-iid="${i.id}" data-g="${g}" data-n="${n}" aria-label="Lihat gambar ${n + 1}">
       <img src="${esc(src)}" alt="Gambar ${n + 1}" loading="lazy">${p.blob && !p.url ? '<i class="up" title="Belum dihantar"></i>' : ''}</button>`;
-  }).join('') + (RO() && g === 'a' ? '' : `<button class="ph" data-act="padd" data-m="cam" data-iid="${i.id}" data-g="${g}" aria-label="Ambil gambar dengan kamera">${ICON.cam}<span>Kamera</span></button><button class="ph gal" data-act="padd" data-m="gal" data-iid="${i.id}" data-g="${g}" aria-label="Pilih gambar dari galeri">${ICON.img}<span>Galeri</span></button>`);
+  }).join('') + (lockedField(i, g) ? '' : `<button class="ph" data-act="padd" data-m="cam" data-iid="${i.id}" data-g="${g}" aria-label="Ambil gambar dengan kamera">${ICON.cam}<span>Kamera</span></button><button class="ph gal" data-act="padd" data-m="gal" data-iid="${i.id}" data-g="${g}" aria-label="Pilih gambar dari galeri">${ICON.img}<span>Galeri</span></button>`);
 }
 function picChips(i, g, k) {
-  if (RO() && g === 'a') return '';
+  if (lockedField(i, g)) return '';
   const cur = String(i[g][k] || '').split(',').map(x => x.trim().toLowerCase());
   return S.pics.length ? `<div class="pchips">${S.pics.map(p => `<button type="button" class="pchip" data-act="pic" data-iid="${i.id}" data-g="${g}" data-k="${k}" data-v="${esc(p)}" aria-pressed="${cur.includes(p.toLowerCase())}">${esc(p)}</button>`).join('')}</div>` : '';
 }
-const fld = (i, g, k, label, en) => `<label class="f"><span>${label} <em>${en}</em></span><textarea ${RO() && g === 'a' ? 'disabled' : ''} data-iid="${i.id}" data-g="${g}" data-k="${k}" rows="2">${esc(i[g][k])}</textarea></label>`;
+const fld = (i, g, k, label, en) => `<label class="f"><span>${label} <em>${en}</em></span><textarea ${lockedField(i, g) ? 'disabled' : ''} data-iid="${i.id}" data-g="${g}" data-k="${k}" rows="2">${esc(i[g][k])}</textarea></label>`;
 
 function issueHtml(i, bil) {
   const stt = issueStatus(i);
@@ -495,12 +497,13 @@ function issueHtml(i, bil) {
     <div class="photos">${tiles(i, 'a', 'fotos')}</div>
     <button class="after-toggle" data-act="itoggle" data-iid="${i.id}" aria-expanded="${open}"><span>Tindakan diambil & maklumbalas</span><b>${open ? '▴' : '▾'}</b></button>
     ${open ? `<div class="after">
+      ${lockB(i) ? '<p class="hint" style="margin:0 0 10px">Isu ini sudah selesai dan tidak boleh diubah.</p>' : ''}
       ${fld(i, 'b', 'diambil', 'Tindakan yang sudah diambil', '/ Action taken')}
       ${fld(i, 'b', 'maklumbalas', 'Maklumbalas', '/ Feedback')}
-      <label class="f"><span>PIC <em>(taip unit atau nama)</em></span><input type="text" data-iid="${i.id}" data-g="b" data-k="picM" list="pics" value="${esc(i.b.picM)}" autocomplete="off"></label>
+      <label class="f"><span>PIC <em>(taip unit atau nama)</em></span><input type="text" data-iid="${i.id}" data-g="b" data-k="picM" list="pics" ${lockedField(i, 'b') ? 'disabled' : ''} value="${esc(i.b.picM)}" autocomplete="off"></label>
       ${picChips(i, 'b', 'picM')}
       <div class="photos">${tiles(i, 'b', 'fotosSelesai')}</div>
-      <label class="chk"><input type="checkbox" data-iid="${i.id}" data-g="b" data-k="selesai" ${i.b.selesai ? 'checked' : ''}> Tandakan isu ini selesai</label>
+      <label class="chk"><input type="checkbox" data-iid="${i.id}" data-g="b" data-k="selesai" ${i.b.selesai ? 'checked' : ''} ${lockedField(i, 'b') ? 'disabled' : ''}> Tandakan isu ini selesai</label>
     </div>` : ''}
   </section>`;
 }
@@ -733,6 +736,7 @@ function openLb(iid, g, n) {
   const i = findIssue(S.cur, iid); if (!i) return;
   const p = (g === 'a' ? i.a.fotos : i.b.fotosSelesai)[n]; if (!p) return;
   S.lb = { iid, g, n };
+  const rm = $('[data-act=lb-remove]'); if (rm) rm.hidden = lockedField(i, g);
   $('#lbImg').src = p.blob ? blobUrl(p.blob) : p.url;
   $('#lightbox').showModal();
 }
@@ -749,7 +753,7 @@ function toast(msg, ms = 2600) {
 document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act]'); if (!el) return;
   const act = el.dataset.act, no = el.dataset.no, iid = el.dataset.iid, r = S.cur;
-  if ((RO() && (['new', 'status', 'iadd', 'idel', 'sig-open', 'sig-clear'].includes(act) || (['padd', 'pic'].includes(act) && el.dataset.g === 'a'))) || (act === 'delete' && !CAN_DEL())) { toast(RO() ? 'Akaun anda hanya boleh mengisi maklumbalas' : 'Hanya penyelia boleh memadam rondaan'); return; }
+  if ((RO() && (['new', 'status', 'iadd', 'idel', 'sig-open', 'sig-clear'].includes(act) || (['padd', 'pic'].includes(act) && (el.dataset.g === 'a' || lockB(findIssue(S.cur, iid) || { b: {} }))))) || (act === 'delete' && !CAN_DEL())) { toast(RO() ? 'Akaun anda hanya boleh mengisi maklumbalas' : 'Hanya penyelia boleh memadam rondaan'); return; }
   switch (act) {
     case 'new': startNew(); break;
     case 'open': openRecord(el.dataset.id); break;
@@ -791,6 +795,7 @@ document.addEventListener('click', async e => {
     case 'lb-remove': {
       if (!S.lb) break;
       const { iid: x, g, n } = S.lb, i = findIssue(r, x);
+      if (lockedField(i, g)) break;
       (g === 'a' ? i.a.fotos : i.b.fotosSelesai).splice(n, 1); g === 'a' ? markA(i) : markB(i);
       touch(r); closeLb(); replaceItem(i.no); break;
     }

@@ -69,7 +69,7 @@ Tab **`Pengguna`** dalam Sheet (dicipta oleh `setup`) menentukan siapa boleh mas
 |---|---|---|
 | **Penyelia** | Semua yang Pemeriksa boleh, serta **padam rondaan** | n/a |
 | **Pemeriksa** | Cipta & edit rondaan, penemuan, tindakan, PIC, gambar, tandatangan; isi maklumbalas; padam isu | Padam rondaan |
-| **Penjawab** | Lihat rondaan & isu; isi *tindakan diambil*, *maklumbalas*, PIC, gambar selesai, tanda selesai; jana laporan | Cipta/edit rondaan, ubah penemuan/tindakan perlu/status item, tambah atau padam isu, padam rondaan |
+| **Penjawab** | Lihat rondaan & isu; isi *tindakan diambil*, *maklumbalas*, PIC, gambar selesai pada **isu yang masih terbuka** sahaja; jana laporan | Cipta/edit rondaan, ubah atau buang gambar rondaan, ubah penemuan/tindakan perlu/status item, tambah atau padam isu, padam rondaan, ubah isu yang sudah selesai |
 
 Sekatan dikuatkuasakan di pelayan (Apps Script), bukan hanya dalam app. Jika tab `Pengguna` **kosong**, app berfungsi seperti sebelum ini (tanpa log masuk, PIN pilihan). Selepas ada pengguna aktif, log masuk diwajibkan untuk semua orang termasuk pemeriksa, jadi tambah akaun anda sendiri dahulu. Lapan percubaan salah menyekat ID itu 10 minit.
 
