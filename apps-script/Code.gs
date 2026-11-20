@@ -72,7 +72,7 @@ function setup() {
   const pic = ensureSheet_(ss, SH.pic, HEAD.pic);
   const usr = ensureSheet_(ss, SH.users, HEAD.users);
   usr.getRange(2, 1, 998, 5).setNumberFormat('@');
-  usr.getRange(1, 7).setValue('Peranan: Pemeriksa = boleh cipta & edit rondaan sepenuhnya. Penjawab = hanya boleh isi tindakan diambil, maklumbalas & gambar selesai. Aktif: Y / N. Kata laluan ditukar kepada kod hash selepas log masuk pertama.');
+  usr.getRange(1, 7).setValue('Peranan: Penyelia = semua kuasa termasuk padam rondaan. Pemeriksa = cipta & edit rondaan, isu & maklumbalas (tidak boleh padam rondaan). Penjawab = hanya isi tindakan diambil, maklumbalas & gambar selesai. Aktif: Y / N. Kata laluan ditukar kepada kod hash selepas log masuk pertama.');
   ensureSheet_(ss, SH.rondaan, HEAD.rondaan);
   ensureSheet_(ss, SH.butiran, HEAD.butiran);
   ensureSheet_(ss, SH.isu, HEAD.isu);
@@ -123,7 +123,7 @@ function dispatch_(b) {
       if (me.peranan === 'Penjawab' && b.kind !== 'selesai') deny_();
       return photo_(b);
     case 'delete':
-      if (me.peranan === 'Penjawab') deny_();
+      if (me.peranan !== 'Penyelia') deny_();
       return delete_(b);
     default: return { ok: false, error: 'Tindakan tidak dikenali' };
   }
@@ -381,7 +381,7 @@ function auth_(c) {
   rows.forEach(function (r, i) { if (s_(r[1]) && s_(r[4]).toUpperCase() !== 'N') active.push({ r: r, row: i + 2 }); });
   if (!active.length) {
     if (PIN && String(c.pin || '') !== String(PIN)) throw new Error('PIN salah');
-    return { nama: '', peranan: 'Pemeriksa', legacy: true };
+    return { nama: '', peranan: 'Penyelia', legacy: true };
   }
   const uid = String(c.user || '').trim().toLowerCase();
   if (!uid || !c.pass) throw loginErr_('Sila log masuk');
@@ -407,7 +407,8 @@ function auth_(c) {
     throw loginErr_('ID pengguna atau kata laluan salah');
   }
   if (cache) cache.remove(ck);
-  const role = /jawab/i.test(s_(hit.r[3])) ? 'Penjawab' : 'Pemeriksa';
+  const rl = s_(hit.r[3]);
+  const role = /jawab/i.test(rl) ? 'Penjawab' : /yelia|supervis/i.test(rl) ? 'Penyelia' : 'Pemeriksa';
   return { nama: s_(hit.r[0]) || s_(hit.r[1]), peranan: role, legacy: false };
 }
 

@@ -41,6 +41,8 @@ const cfg = (() => {
     user: st.user || '', pass: st.pass || '', role: st.role || '', nama: st.nama || '' };
 })();
 const RO = () => cfg.role === 'Penjawab';
+const CAN_DEL = () => cfg.role !== 'Penjawab' && cfg.role !== 'Pemeriksa';
+const roleLabel = r => r === 'Penjawab' ? 'Penjawab maklumbalas' : r === 'Pemeriksa' ? 'Pemeriksa' : 'Penyelia';
 const saveCfg = () => { try { localStorage.setItem('gr.cfg', JSON.stringify(cfg)); } catch { /* abaikan */ } };
 
 /* ───────── IndexedDB ───────── */
@@ -354,7 +356,7 @@ function viewHome() {
   </header>
   <main>
     ${banner}
-    ${cfg.user ? `<div class="who">Log masuk: <b>${esc(cfg.nama || cfg.user)}</b> · ${esc(cfg.role === 'Penjawab' ? 'Penjawab maklumbalas' : 'Pemeriksa')}</div>` : ''}
+    ${cfg.user ? `<div class="who">Log masuk: <b>${esc(cfg.nama || cfg.user)}</b> · ${esc(roleLabel(cfg.role))}</div>` : ''}
     ${RO() ? '' : `<button class="btn cta" data-act="new">${ICON.plus} Rondaan Baharu</button>`}
     <div class="tabs" role="tablist">
       <button role="tab" data-act="tab" data-t="rondaan" aria-selected="${S.tab === 'rondaan'}">Rondaan <i>${recs.length}</i></button>
@@ -389,7 +391,7 @@ function viewEditor() {
     <div class="ttl"><b>Rondaan</b><small id="progTxt"></small></div>
     <span class="chip-s" id="syncChip">${esc(syncLabel())}</span>
     <button class="icon" data-act="report" aria-label="Laporan">${ICON.doc}</button>
-    ${RO() ? '' : `<button class="icon" data-act="delete" aria-label="Padam rondaan">${ICON.trash}</button>`}
+    ${!CAN_DEL() ? '' : `<button class="icon" data-act="delete" aria-label="Padam rondaan">${ICON.trash}</button>`}
   </header>
   <div class="progress"><i id="progBar"></i></div>
   <main>
@@ -602,7 +604,7 @@ function viewSettings() {
       </div>
       <p class="hint" id="cfgMsg" style="margin:12px 0 0"></p>
     </section>
-    ${cfg.user ? `<h2 class="sec">Akaun</h2><section class="card"><p style="margin:0 0 10px">Log masuk sebagai <b>${esc(cfg.nama || cfg.user)}</b> (${esc(cfg.role === 'Penjawab' ? 'Penjawab maklumbalas' : 'Pemeriksa')})</p><button class="btn ghost" data-act="logout">Log keluar</button></section>` : ''}
+    ${cfg.user ? `<h2 class="sec">Akaun</h2><section class="card"><p style="margin:0 0 10px">Log masuk sebagai <b>${esc(cfg.nama || cfg.user)}</b> (${esc(roleLabel(cfg.role))})</p><button class="btn ghost" data-act="logout">Log keluar</button></section>` : ''}
     <h2 class="sec">Pasang di telefon</h2>
     <section class="card">
       ${standalone ? '<p style="margin:0">App sudah dipasang di skrin utama.</p>'
@@ -636,7 +638,7 @@ async function doLogin() {
     const j = await apiPost('login', {});
     cfg.role = j.me.peranan; cfg.nama = j.me.legacy ? '' : j.me.nama; saveCfg();
     S.tab = cfg.role === 'Penjawab' ? 'isu' : 'rondaan';
-    setView('home'); syncAll(true);
+    history.replaceState({ v: 'home' }, ''); setView('home'); syncAll(true);
   } catch (e) { Object.assign(cfg, keep); msg.textContent = e.message; }
 }
 function logout() {
@@ -747,7 +749,7 @@ function toast(msg, ms = 2600) {
 document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act]'); if (!el) return;
   const act = el.dataset.act, no = el.dataset.no, iid = el.dataset.iid, r = S.cur;
-  if (RO() && (['new', 'status', 'iadd', 'idel', 'sig-open', 'sig-clear', 'delete'].includes(act) || (['padd', 'pic'].includes(act) && el.dataset.g === 'a'))) { toast('Akaun anda hanya boleh mengisi maklumbalas'); return; }
+  if ((RO() && (['new', 'status', 'iadd', 'idel', 'sig-open', 'sig-clear'].includes(act) || (['padd', 'pic'].includes(act) && el.dataset.g === 'a'))) || (act === 'delete' && !CAN_DEL())) { toast(RO() ? 'Akaun anda hanya boleh mengisi maklumbalas' : 'Hanya penyelia boleh memadam rondaan'); return; }
   switch (act) {
     case 'new': startNew(); break;
     case 'open': openRecord(el.dataset.id); break;
