@@ -117,7 +117,7 @@ const findIssue = (r, iid) => r.issues.find(i => i.id === iid);
 function bilOf(r, i) { const l = issuesOf(r, i.no); return l.length > 1 ? `${i.no}.${l.indexOf(i) + 1}` : String(i.no); }
 
 function newRecord() {
-  return { v: SCHEMA, id: genId(), meta: { lokasi: '', tarikh: todayStr(), masa: nowStr(), pegawai: cfg.officer || '', semakNama: '', semakTtd: '', semakTarikh: '' },
+  return { v: SCHEMA, id: genId(), meta: { lokasi: '', tarikh: todayStr(), masa: nowStr(), pegawai: cfg.officer || '', semakNama: '', semakTtd: '', semakTarikh: '', masaTamat: '' },
     st: {}, issues: [], d: { meta: true, st: {} }, mrev: 0, fresh: true, loaded: true, serverUpdated: '' };
 }
 function counts(r) {
@@ -140,6 +140,14 @@ function touch(r) {
 }
 const markA = i => { i.da = true; i.ta = Date.now(); };
 const markB = i => { i.db = true; i.tb = Date.now(); };
+const toMin = t => { const m = /^(\d\d):(\d\d)/.exec(t || ''); return m ? +m[1] * 60 + +m[2] : null; };
+function duration(a, b) {
+  const x = toMin(a), y = toMin(b); if (x === null || y === null) return '';
+  let d = y - x; if (d < 0) d += 1440;
+  const h = Math.floor(d / 60), m = d % 60;
+  return (h ? h + ' jam' : '') + (h && m ? ' ' : '') + (m || !h ? m + ' min' : '');
+}
+const timeRange = m => m.masa ? `${m.masa}${m.masaTamat ? ' – ' + m.masaTamat : ''}${duration(m.masa, m.masaTamat) ? ' (' + duration(m.masa, m.masaTamat) + ')' : ''}` : '';
 const recKey = r => `${r.meta.tarikh || ''}${r.meta.masa || ''}${r.serverUpdated || ''}${r.id}`;
 
 /* penukaran data pelayan -> tempatan */
@@ -391,7 +399,11 @@ function viewEditor() {
         <input type="text" data-meta="lokasi" list="locs" value="${esc(m.lokasi)}" placeholder="cth: Blok A – Kawasan luar" autocomplete="off"></label>
       <div class="grid2">
         <label class="f"><span>Tarikh</span><input type="date" data-meta="tarikh" value="${esc(m.tarikh)}"></label>
-        <label class="f"><span>Masa</span><input type="time" data-meta="masa" value="${esc(m.masa)}"></label>
+        <label class="f"><span>Masa mula</span><input type="time" data-meta="masa" value="${esc(m.masa)}"></label>
+      </div>
+      <div class="grid2">
+        <label class="f"><span>Masa tamat</span><input type="time" data-meta="masaTamat" value="${esc(m.masaTamat || '')}"></label>
+        <div class="f"><span>Tempoh</span><div class="dur" id="durTxt">${esc(duration(m.masa, m.masaTamat) || '—')}</div></div>
       </div>
       <label class="f" style="margin:0"><span>Ketua Rondaan</span>
         <input type="text" data-meta="pegawai" value="${esc(m.pegawai)}" autocomplete="name"></label>
@@ -531,7 +543,7 @@ function reportHtml(r) {
   const none = '<tr><td colspan="5" class="c mut">Tiada penemuan / isu direkodkan.</td></tr>';
   return `<div class="rpt">
     <h1>LAPORAN GLORY ROUND</h1>
-    <div class="rh"><div><b>Tarikh</b> : ${fmtDate(m.tarikh)}</div><div><b>Masa</b> : ${esc(m.masa)}</div><div><b>Tempat</b> : ${esc(m.lokasi)}</div><div><b>Ketua Rondaan</b> : ${esc(m.pegawai)}</div></div>
+    <div class="rh"><div><b>Tarikh</b> : ${fmtDate(m.tarikh)}</div><div><b>Masa</b> : ${esc(timeRange(m))}</div><div><b>Tempat</b> : ${esc(m.lokasi)}</div><div><b>Ketua Rondaan</b> : ${esc(m.pegawai)}</div></div>
     <h2>A. Penemuan dan Tindakan yang Perlu Diambil</h2>
     <table><thead><tr><th class="w1">Bil.</th><th class="w2">Penemuan</th><th class="w3">Tindakan yang perlu diambil</th><th class="w4">P.I.C.</th><th class="w5">Gambar</th></tr></thead><tbody>${rows1.join('') || none}</tbody></table>
     <h2>B. Tindakan yang Telah Diambil dan Maklumbalas</h2>
@@ -769,7 +781,7 @@ document.addEventListener('click', async e => {
 document.addEventListener('input', e => {
   const t = e.target, r = S.cur;
   if (!r) return;
-  if (t.dataset.meta) { r.meta[t.dataset.meta] = t.value; r.d.meta = true; r.mrev++; touch(r); return; }
+  if (t.dataset.meta) { r.meta[t.dataset.meta] = t.value; r.d.meta = true; r.mrev++; touch(r); const dt = $('#durTxt'); if (dt) dt.textContent = duration(r.meta.masa, r.meta.masaTamat) || '—'; return; }
   if (t.dataset.iid && t.dataset.k) {
     const i = findIssue(r, t.dataset.iid); if (!i) return;
     const g = t.dataset.g, k = t.dataset.k;

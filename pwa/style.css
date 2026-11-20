@@ -239,3 +239,5 @@ dialog#sigDlg::backdrop { background: #000a; }
   #printArea { display: block; padding: 10mm; }
   .rpt .gm img { width: 110px; height: 82px; }
 }
+
+.dur { min-height: 48px; display: flex; align-items: center; padding: 0 12px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); font-weight: 650; }
