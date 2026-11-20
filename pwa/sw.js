@@ -1,5 +1,5 @@
 // Service worker: app boleh dibuka tanpa internet (cangkerang sahaja; data ada dalam IndexedDB).
-const VERSION = 'gr-v4';
+const VERSION = 'gr-v5';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'config.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 

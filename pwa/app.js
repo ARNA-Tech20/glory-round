@@ -28,6 +28,7 @@ const ICON = {
   doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
   send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 15v4h14v-4"/></svg>',
+  img: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-9 9"/></svg>',
   print: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>'
 };
 
@@ -116,7 +117,7 @@ const findIssue = (r, iid) => r.issues.find(i => i.id === iid);
 function bilOf(r, i) { const l = issuesOf(r, i.no); return l.length > 1 ? `${i.no}.${l.indexOf(i) + 1}` : String(i.no); }
 
 function newRecord() {
-  return { v: SCHEMA, id: genId(), meta: { lokasi: '', tarikh: todayStr(), masa: nowStr(), pegawai: cfg.officer || '' },
+  return { v: SCHEMA, id: genId(), meta: { lokasi: '', tarikh: todayStr(), masa: nowStr(), pegawai: cfg.officer || '', semakNama: '', semakTtd: '', semakTarikh: '' },
     st: {}, issues: [], d: { meta: true, st: {} }, mrev: 0, fresh: true, loaded: true, serverUpdated: '' };
 }
 function counts(r) {
@@ -178,6 +179,11 @@ async function syncRecord(r) {
     S.progress = `Menghantar gambar ${++n}/${pend.length}`; updateSyncUi();
     const j = await apiPost('photo', { id: r.id, no: p.i.no, kind: p.g === 'a' ? 'foto' : 'selesai', mime: p.ph.blob.type || 'image/jpeg', data: await blobToB64(p.ph.blob) }, 90000);
     p.ph.url = j.url; await persist(r);
+  }
+  if (r.sigBlob) {
+    S.progress = 'Menghantar tandatangan'; updateSyncUi();
+    const sj = await apiPost('photo', { id: r.id, no: 0, kind: 'ttd', mime: 'image/png', data: await blobToB64(r.sigBlob) }, 90000);
+    r.meta.semakTtd = sj.url; r.sigBlob = null; r.d.meta = true; r.mrev++; await persist(r);
   }
   S.progress = 'Menyimpan ke Google Sheet'; updateSyncUi();
   const sentMrev = r.mrev, sentSt = { ...r.d.st }, sentIss = [];
@@ -394,6 +400,7 @@ function viewEditor() {
     <datalist id="pics">${S.pics.map(l => `<option value="${esc(l)}">`).join('')}</datalist>
     <div class="chips" id="chips">${chipsHtml()}</div>
     <div id="list">${listHtml()}</div>
+    <div id="semak">${semakHtml()}</div>
   </main>
   <footer class="bar">
     <div class="stats" id="stats"></div>
@@ -401,6 +408,18 @@ function viewEditor() {
   </footer>`;
 }
 
+const sigSrc = r => r.sigBlob ? blobUrl(r.sigBlob) : (r.meta.semakTtd || '');
+function semakHtml() {
+  const r = S.cur, m = r.meta, src = sigSrc(r);
+  return `<h2 class="sec">Semakan & pengesahan</h2><section class="card">
+    <label class="f"><span>Disemak oleh <em>(nama penyemak)</em></span><input type="text" data-meta="semakNama" value="${esc(m.semakNama || '')}" autocomplete="name"></label>
+    <div class="sig-box">${src ? `<img src="${esc(src)}" alt="Tandatangan">` : '<span>Belum ditandatangani</span>'}</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+      <button class="btn" data-act="sig-open">${src ? 'Tandatangan semula' : 'Tandatangan digital'}</button>
+      ${src ? '<button class="btn ghost" data-act="sig-clear">Buang</button>' : ''}</div>
+    <p class="hint" style="margin:12px 0 0">Ruang <b>Disahkan oleh</b> dalam laporan dikosongkan untuk tandatangan basah selepas dicetak.</p>
+  </section>`;
+}
 function chipsHtml() {
   const r = S.cur, c = counts(r), f = S.filter;
   const chip = (k, label) => `<button class="chip" data-act="filter" data-f="${k}" aria-pressed="${f === k}">${label}</button>`;
@@ -439,7 +458,7 @@ function tiles(i, g, k) {
     const src = p.blob ? blobUrl(p.blob) : p.url;
     return `<button class="ph has" data-act="pview" data-iid="${i.id}" data-g="${g}" data-n="${n}" aria-label="Lihat gambar ${n + 1}">
       <img src="${esc(src)}" alt="Gambar ${n + 1}" loading="lazy">${p.blob && !p.url ? '<i class="up" title="Belum dihantar"></i>' : ''}</button>`;
-  }).join('') + `<button class="ph" data-act="padd" data-iid="${i.id}" data-g="${g}" aria-label="Tambah gambar">${ICON.cam}<span>${list.length ? 'Tambah' : 'Gambar'}</span></button>`;
+  }).join('') + `<button class="ph" data-act="padd" data-m="cam" data-iid="${i.id}" data-g="${g}" aria-label="Ambil gambar dengan kamera">${ICON.cam}<span>Kamera</span></button><button class="ph gal" data-act="padd" data-m="gal" data-iid="${i.id}" data-g="${g}" aria-label="Pilih gambar dari galeri">${ICON.img}<span>Galeri</span></button>`;
 }
 function picChips(i, g, k) {
   const cur = String(i[g][k] || '').split(',').map(x => x.trim().toLowerCase());
@@ -518,6 +537,10 @@ function reportHtml(r) {
     <h2>B. Tindakan yang Telah Diambil dan Maklumbalas</h2>
     <table><thead><tr><th class="w1">Bil.</th><th class="w2">Tindakan yang sudah diambil</th><th class="w3">Maklumbalas</th><th class="w4">PIC</th><th class="w5">Gambar</th></tr></thead><tbody>${rows2.join('') || none}</tbody></table>
     <div class="sum">Item diperiksa: ${S.items.length} · Patuh (Y): ${c.y} · Tidak patuh (N): ${c.n} · Tidak berkaitan (NA): ${c.na} · Belum diisi: ${c.blank} · Isu: ${c.iss} (belum selesai: ${c.open})</div>
+    <div class="signs">
+      <div class="sg"><b>Disemak oleh:</b><div class="sbox">${sigSrc(r) ? `<img src="${esc(sigSrc(r))}" alt="">` : ''}</div><div>Nama : ${esc(m.semakNama || '')}</div><div>Tarikh : ${fmtDate(m.semakTarikh)}</div></div>
+      <div class="sg"><b>Disahkan oleh:</b><div class="sbox"></div><div>Nama : ........................................</div><div>Jawatan : .....................................</div><div>Tarikh : ......................................</div></div>
+    </div>
   </div>`;
 }
 function viewReport() {
@@ -613,9 +636,35 @@ async function compress(file, stamp) {
   }
   return new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('toBlob')), 'image/jpeg', 0.72));
 }
+/* tandatangan digital */
+let sigDrawn = false, sigDown = false;
+function sigCanvas() { return $('#sigCv'); }
+function sigClear() { const c = sigCanvas(), x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); sigDrawn = false; }
+function openSig() {
+  const d = $('#sigDlg'); d.showModal();
+  const c = sigCanvas(), w = Math.min(560, d.clientWidth - 32);
+  c.width = Math.round(w * 2); c.height = Math.round(w * 0.6 * 2); c.style.width = w + 'px'; c.style.height = Math.round(w * 0.6) + 'px';
+  sigClear();
+}
+function sigPos(e) { const c = sigCanvas(), b = c.getBoundingClientRect(); return [(e.clientX - b.left) * c.width / b.width, (e.clientY - b.top) * c.height / b.height]; }
+{
+  const c = $('#sigCv'), x = c.getContext('2d');
+  c.addEventListener('pointerdown', e => { sigDown = true; c.setPointerCapture(e.pointerId); const [px, py] = sigPos(e); x.lineWidth = 5; x.lineCap = x.lineJoin = 'round'; x.strokeStyle = '#111'; x.beginPath(); x.moveTo(px, py); x.lineTo(px + .1, py + .1); x.stroke(); sigDrawn = true; e.preventDefault(); });
+  c.addEventListener('pointermove', e => { if (!sigDown) return; const [px, py] = sigPos(e); x.lineTo(px, py); x.stroke(); x.beginPath(); x.moveTo(px, py); e.preventDefault(); });
+  ['pointerup', 'pointercancel'].forEach(t => c.addEventListener(t, () => { sigDown = false; }));
+}
+function sigDone() {
+  if (!sigDrawn) { toast('Sila tandatangan dahulu'); return; }
+  sigCanvas().toBlob(b => {
+    const r = S.cur; if (!r || !b) return;
+    r.sigBlob = b; r.meta.semakTarikh = todayStr(); if (!r.meta.semakNama) r.meta.semakNama = cfg.officer || '';
+    r.d.meta = true; r.mrev++; touch(r); $('#sigDlg').close(); $('#semak').innerHTML = semakHtml(); toast('Tandatangan disimpan');
+  }, 'image/png');
+}
+
 let pickTarget = null;
-function pick(iid, g) { pickTarget = { iid, g }; const p = $('#picker'); p.value = ''; p.click(); }
-$('#picker').addEventListener('change', async e => {
+function pick(iid, g, mode) { pickTarget = { iid, g }; const p = $(mode === 'cam' ? '#camPicker' : '#picker'); p.value = ''; p.click(); }
+['#picker', '#camPicker'].forEach(sel => $(sel).addEventListener('change', async e => {
   const f = e.target.files[0];
   if (!f || !pickTarget || !S.cur) return;
   const { iid, g } = pickTarget; pickTarget = null;
@@ -628,7 +677,7 @@ $('#picker').addEventListener('change', async e => {
     g === 'a' ? markA(i) : markB(i);
     touch(S.cur); persist(S.cur); replaceItem(i.no); toast('Gambar ditambah');
   } catch { toast('Gagal memproses gambar'); }
-});
+}));
 
 function openLb(iid, g, n) {
   const i = findIssue(S.cur, iid); if (!i) return;
@@ -680,7 +729,12 @@ document.addEventListener('click', async e => {
       if (at >= 0) parts.splice(at, 1); else parts.push(v);
       i[g][k] = parts.join(', '); g === 'a' ? markA(i) : markB(i); touch(r); replaceItem(i.no); break;
     }
-    case 'padd': pick(iid, el.dataset.g); break;
+    case 'padd': pick(iid, el.dataset.g, el.dataset.m); break;
+    case 'sig-open': openSig(); break;
+    case 'sig-clear': r.sigBlob = null; r.meta.semakTtd = ''; r.meta.semakTarikh = ''; r.d.meta = true; r.mrev++; touch(r); $('#semak').innerHTML = semakHtml(); break;
+    case 'sig-undo': sigClear(); break;
+    case 'sig-cancel': $('#sigDlg').close(); break;
+    case 'sig-ok': sigDone(); break;
     case 'pview': openLb(iid, el.dataset.g, +el.dataset.n); break;
     case 'lb-close': closeLb(); break;
     case 'lb-remove': {

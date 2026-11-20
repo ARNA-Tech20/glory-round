@@ -29,6 +29,16 @@
 
 <div id="printArea"></div>
 <input type="file" id="picker" accept="image/*" hidden>
+<input type="file" id="camPicker" accept="image/*" capture="environment" hidden>
+<dialog id="sigDlg">
+  <b>Tandatangan penyemak</b>
+  <canvas id="sigCv"></canvas>
+  <div class="lb-row">
+    <button class="btn ghost" data-act="sig-undo">Padam</button>
+    <button class="btn ghost" data-act="sig-cancel">Batal</button>
+    <button class="btn" data-act="sig-ok">Simpan</button>
+  </div>
+</dialog>
 
 <script src="config.js"></script>
 <script src="app.js"></script>

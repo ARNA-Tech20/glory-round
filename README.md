@@ -30,10 +30,10 @@ Borang Excel `GLORY ROUND` ditukar kepada app telefon (PWA). Data disimpan dalam
 
 1. **Rondaan Baharu** > isi Tempat, Tarikh, Masa, Ketua Rondaan.
 2. Setiap no. item: tekan **Y / N / NA**. Jika **N**, satu isu dibuka automatik. Tekan **+ Tambah isu / penemuan** untuk isu ke-2 hingga ke-5 (dan seterusnya) bagi no. yang sama. Isu dinomborkan 2.1, 2.2, 2.3.
-3. Setiap isu: **Penemuan**, **Tindakan yang perlu diambil**, **PIC** (unit atau nama; tekan butang Medivest / UPPP / UKK atau taip sendiri) dan seberapa banyak **gambar** (kamera atau galeri).
+3. Setiap isu: **Penemuan**, **Tindakan yang perlu diambil**, **PIC** (unit atau nama; tekan butang Medivest / UPPP / UKK atau taip sendiri) dan seberapa banyak **gambar** (butang **Kamera** membuka kamera terus; **Galeri** untuk pilih gambar sedia ada).
 4. **Simpan & Hantar** menghantar gambar ke Drive dan data ke Sheet. Tanpa internet, data disimpan dalam telefon dan dihantar sendiri kemudian.
 5. **Selepas kerja siap**: sesiapa boleh buka tab **Isu terbuka** (atau buka rondaan), tekan isu, kembangkan **Tindakan diambil & maklumbalas**, isi *Tindakan yang sudah diambil*, *Maklumbalas*, PIC, gambar selesai, dan tanda **selesai**. Dua orang boleh edit rondaan yang sama; data digabung ikut isu (bahagian penemuan dan bahagian maklumbalas disimpan berasingan).
-6. Ikon dokumen (atas) membuka **Laporan Glory Round** ikut lakaran: Tarikh, Masa, Tempat, Ketua Rondaan; Jadual A (Bil., Penemuan, Tindakan perlu diambil, PIC, Gambar) dan Jadual B (Tindakan sudah diambil, Maklumbalas, PIC, Gambar), kertas A4 landskap. Tekan **Cetak / PDF** > Simpan sebagai PDF.
+6. Ikon dokumen (atas) membuka **Laporan Glory Round** ikut lakaran: Tarikh, Masa, Tempat, Ketua Rondaan; Jadual A (Bil., Penemuan, Tindakan perlu diambil, PIC, Gambar) dan Jadual B (Tindakan sudah diambil, Maklumbalas, PIC, Gambar), kertas A4 landskap. Di bawah laporan ada **Disemak oleh** (tandatangan digital, dilukis pada skrin dalam bahagian *Semakan & pengesahan* di hujung borang) dan **Disahkan oleh** (dikosongkan untuk tandatangan basah selepas dicetak). Tekan **Cetak / PDF** > Simpan sebagai PDF.
 
 ## Struktur Google Sheet
 
@@ -41,7 +41,7 @@ Borang Excel `GLORY ROUND` ditukar kepada app telefon (PWA). Data disimpan dalam
 |---|---|
 | `Senarai Semak` | No, kategori & item (EN/BM), **Aktif**. Letak `N` pada Aktif untuk sorok item |
 | `Senarai PIC` | Senarai unit/nama untuk butang pantas PIC (ubah ikut keperluan) |
-| `Rondaan` | 1 baris/rondaan: ID, tempat, tarikh, masa, ketua, jumlah Y/N/NA, jumlah isu, isu belum selesai |
+| `Rondaan` | 1 baris/rondaan: ID, tempat, tarikh, masa, ketua, jumlah Y/N/NA, jumlah isu, isu belum selesai, nama penyemak, pautan tandatangan, tarikh semakan |
 | `Butiran` | 1 baris/item/rondaan: status Y/N/NA dan bilangan isu |
 | `Isu` | 1 baris/isu: penemuan, tindakan, PIC, gambar, tindakan diambil, maklumbalas, PIC, gambar selesai, status (Terbuka / Dalam tindakan / Selesai) |
 

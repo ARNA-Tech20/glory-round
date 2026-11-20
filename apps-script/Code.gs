@@ -24,7 +24,7 @@ const SH = { items: 'Senarai Semak', pic: 'Senarai PIC', rondaan: 'Rondaan', but
 const HEAD = {
   items: ['No', 'Kategori (EN)', 'Kategori (BM)', 'Item (EN)', 'Item (BM)', 'Aktif'],
   pic: ['PIC (unit / nama)'],
-  rondaan: ['ID', 'Tempat', 'Tarikh', 'Masa', 'Ketua Rondaan', 'Patuh (Y)', 'Tidak Patuh (N)', 'NA', 'Belum Diisi', 'Jumlah Isu', 'Isu Belum Selesai', 'Dikemas Kini'],
+  rondaan: ['ID', 'Tempat', 'Tarikh', 'Masa', 'Ketua Rondaan', 'Patuh (Y)', 'Tidak Patuh (N)', 'NA', 'Belum Diisi', 'Jumlah Isu', 'Isu Belum Selesai', 'Dikemas Kini', 'Disemak Oleh', 'Tandatangan Semakan', 'Tarikh Semakan'],
   butiran: ['ID Rondaan', 'No', 'Kategori', 'Item', 'Status', 'Bil. Isu', 'Dikemas Kini'],
   isu: ['ID Isu', 'ID Rondaan', 'No', 'Bil.', 'Penemuan', 'Tindakan Perlu Diambil', 'PIC (Tindakan)', 'Gambar',
     'Tindakan Diambil', 'Maklumbalas', 'PIC (Maklumbalas)', 'Gambar Selesai', 'Selesai', 'Status Isu',
@@ -188,7 +188,7 @@ function issueStatus_(x) {
 }
 
 function buildRecord_(id) {
-  const head = table_(sheet_(SH.rondaan), 12).filter(function (r) { return s_(r[0]) === id; })[0];
+  const head = table_(sheet_(SH.rondaan), 15).filter(function (r) { return s_(r[0]) === id; })[0];
   if (!head) throw new Error('Rondaan tidak dijumpai');
   const st = {};
   table_(sheet_(SH.butiran), 7).forEach(function (r) { if (s_(r[0]) === id) st[Number(r[1])] = s_(r[4]); });
@@ -198,7 +198,7 @@ function buildRecord_(id) {
     .filter(function (x) { return !x.del; });
   return {
     id: id,
-    meta: { lokasi: s_(head[1]), tarikh: s_(head[2], 'yyyy-MM-dd'), masa: s_(head[3], 'HH:mm'), pegawai: s_(head[4]) },
+    meta: { lokasi: s_(head[1]), tarikh: s_(head[2], 'yyyy-MM-dd'), masa: s_(head[3], 'HH:mm'), pegawai: s_(head[4]), semakNama: s_(head[12]), semakTtd: s_(head[13]), semakTarikh: s_(head[14], 'yyyy-MM-dd') },
     st: st, issues: issues, updated: s_(head[11])
   };
 }
@@ -307,14 +307,15 @@ function save_(b) {
     /* 3. Rondaan */
     const rs = sheet_(SH.rondaan);
     const row = findRow_(rs, id, 0);
-    const old = row ? rs.getRange(row, 1, 1, 12).getValues()[0] : null;
+    const old = row ? rs.getRange(row, 1, 1, 15).getValues()[0] : null;
     if (!b.meta && !old) throw new Error('Maklumat rondaan (meta) diperlukan');
-    const m = b.meta || { lokasi: old[1], tarikh: s_(old[2], 'yyyy-MM-dd'), masa: s_(old[3], 'HH:mm'), pegawai: old[4] };
+    const m = b.meta || { lokasi: old[1], tarikh: s_(old[2], 'yyyy-MM-dd'), masa: s_(old[3], 'HH:mm'), pegawai: old[4], semakNama: s_(old[12]), semakTtd: s_(old[13]), semakTarikh: s_(old[14], 'yyyy-MM-dd') };
     const open = live.filter(function (x) { return x.status !== 'Selesai'; }).length;
-    const line = [id, txt_(m.lokasi, 200), txt_(m.tarikh, 10), txt_(m.masa, 5), txt_(m.pegawai, 200), y, n, na, blank, live.length, open, now];
+    const line = [id, txt_(m.lokasi, 200), txt_(m.tarikh, 10), txt_(m.masa, 5), txt_(m.pegawai, 200), y, n, na, blank, live.length, open, now, txt_(m.semakNama, 200), url_(m.semakTtd), txt_(m.semakTarikh, 10)];
     const target = row || rs.getLastRow() + 1;
     rs.getRange(target, 2, 1, 4).setNumberFormat('@');
-    rs.getRange(target, 1, 1, 12).setValues([line]);
+    rs.getRange(target, 13, 1, 3).setNumberFormat('@');
+    rs.getRange(target, 1, 1, 15).setValues([line]);
 
     return { ok: true, updated: now, record: buildRecord_(id) };
   } finally {
@@ -325,7 +326,7 @@ function save_(b) {
 function photo_(b) {
   const id = validId_(b.id);
   const no = Number(b.no) || 0;
-  const kind = b.kind === 'selesai' ? 'selesai' : 'foto';
+  const kind = b.kind === 'selesai' ? 'selesai' : b.kind === 'ttd' ? 'ttd' : 'foto';
   if (!b.data || String(b.data).length > 9 * 1024 * 1024) throw new Error('Gambar tiada atau terlalu besar');
   const mime = /^image\/(jpeg|png|webp)$/.test(b.mime) ? b.mime : 'image/jpeg';
   const ext = mime.split('/')[1].replace('jpeg', 'jpg');
@@ -413,6 +414,9 @@ function migrate_(ss, name, head) {
   if (!sh || sh.getLastRow() === 0) return;
   const cur = sh.getRange(1, 1, 1, head.length).getValues()[0];
   if (cur.join('|') === head.join('|')) return;
+  // Sheet versi sama tetapi kurang lajur baharu di hujung: tambah tajuk sahaja, data kekal
+  let nk = cur.length; while (nk > 0 && cur[nk - 1] === '') nk--;
+  if (nk > 0 && cur.slice(0, nk).join('|') === head.slice(0, nk).join('|')) { sh.getRange(1, nk + 1, 1, head.length - nk).setValues([head.slice(nk)]); return; }
   let n = name + ' (lama)', k = 2;
   while (ss.getSheetByName(n)) n = name + ' (lama ' + (k++) + ')';
   sh.setName(n);
