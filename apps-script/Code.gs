@@ -36,7 +36,7 @@ const SEED_PIC = []; // PIC diisi sendiri oleh pengguna dalam app (atau tambah s
 // [No, Kategori EN, Kategori BM, Item EN, Item BM]
 const SEED = [
   [1, "Common Areas & Housekeeping", "Kawasan Umum & Kebersihan", "Main entrance, lobby and reception area cleanliness maintained.", "Kebersihan pintu masuk utama, lobi dan kaunter penerimaan tetamu sentiasa terjaga."],
-  [2, "Common Areas & Housekeeping", "Kawasan Umum & Kebersihan", "Public waiting areas and seating condition well-kept.", "Ruang menunggu awam dan keadaan tempat duduk diselenggara dengan baik."],
+  [2, "Common Areas & Housekeeping", "Kawasan Umum & Kebersihan", "Public waiting areas and premises condition well-maintained.", "Ruang menunggu awam dan keadaan tempat perlu diselenggara dengan baik."],
   [3, "Common Areas & Housekeeping", "Kawasan Umum & Kebersihan", "Public toilets cleanliness and availability of supplies monitored.", "Kebersihan tandas awam serta ketersediaan bekalan keperluan dipantau."],
   [4, "Common Areas & Housekeeping", "Kawasan Umum & Kebersihan", "Corridors, staircases and lifts clean and functional.", "Koridor, tangga dan lif berada dalam keadaan bersih serta berfungsi."],
   [5, "Common Areas & Housekeeping", "Kawasan Umum & Kebersihan", "Waste bins, waste collection and general waste segregation strictly followed.", "Tong sampah, pengumpulan sisa dan pengasingan sisa am dilaksanakan mengikut ketetapan."],
