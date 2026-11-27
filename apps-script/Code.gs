@@ -81,6 +81,15 @@ function setup() {
     items.getRange(2, 2, rows.length, 4).setNumberFormat('@');
     items.getRange(2, 1, rows.length, 6).setValues(rows);
   }
+  // Pindaan teks item 2 (hanya jika masih teks lama)
+  if (items.getLastRow() >= 2) {
+    const data = items.getRange(2, 1, items.getLastRow() - 1, 5).getValues();
+    data.forEach(function (r, i) {
+      if (Number(r[0]) === 2 && String(r[4]).indexOf('tempat duduk') >= 0) {
+        items.getRange(i + 2, 4, 1, 2).setValues([['Public waiting areas and premises condition well-maintained.', 'Ruang menunggu awam dan keadaan tempat perlu diselenggara dengan baik.']]);
+      }
+    });
+  }
   if (pic.getLastRow() < 2) {
     if (SEED_PIC.length) pic.getRange(2, 1, SEED_PIC.length, 1).setValues(SEED_PIC.map(function (p) { return [p]; }));
   }
